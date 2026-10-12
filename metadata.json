@@ -1,0 +1,6 @@
+{
+  "name": "Hisaab",
+  "description": "Quiet Ledger personal finance and money tracker for managing accounts, expenses, income, transfers, and needs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
