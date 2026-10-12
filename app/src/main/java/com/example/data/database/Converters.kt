@@ -20,8 +20,14 @@ class Converters {
     fun fromAccountType(value: AccountType): String = value.name
 
     @TypeConverter
-    fun toAccountType(value: String): AccountType =
-        runCatching { AccountType.valueOf(value) }.getOrDefault(AccountType.CASH)
+    fun toAccountType(value: String): AccountType {
+        return when (value.uppercase()) {
+            "CASH", "WALLET", "CASH_WALLET" -> AccountType.CASH_WALLET
+            "BANK" -> AccountType.BANK
+            "SAVINGS" -> AccountType.SAVINGS
+            else -> AccountType.OTHER
+        }
+    }
 
     @TypeConverter
     fun fromCategoryType(value: CategoryType): String = value.name

@@ -49,6 +49,15 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
     val totalBalancePaisa: StateFlow<Long> = repository.totalBalancePaisa
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
+    val remainingBalancePaisa: StateFlow<Long> = repository.remainingBalancePaisa
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val activeReservedTotalPaisa: StateFlow<Long> = repository.activeReservedTotalPaisa
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val reservedAmounts: StateFlow<List<ReservedAmountEntity>> = repository.reservedAmounts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val accountsWithBalances: StateFlow<List<AccountWithBalance>> = repository.accountsWithBalances
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -230,6 +239,24 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
     fun updateCategory(category: CategoryEntity) {
         viewModelScope.launch {
             repository.updateCategory(category)
+        }
+    }
+
+    fun addReservedAmount(title: String, amountPaisa: Long, targetDateEpochMs: Long?, note: String) {
+        viewModelScope.launch {
+            repository.addReservedAmount(title, amountPaisa, targetDateEpochMs, note)
+        }
+    }
+
+    fun toggleReservedAmountActive(reserved: ReservedAmountEntity) {
+        viewModelScope.launch {
+            repository.toggleReservedAmountActive(reserved)
+        }
+    }
+
+    fun deleteReservedAmount(reserved: ReservedAmountEntity) {
+        viewModelScope.launch {
+            repository.deleteReservedAmount(reserved)
         }
     }
 

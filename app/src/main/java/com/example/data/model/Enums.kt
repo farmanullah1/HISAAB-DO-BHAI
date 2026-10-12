@@ -7,10 +7,10 @@ enum class TransactionType {
 }
 
 enum class AccountType {
-    CASH,
+    CASH_WALLET,
     BANK,
-    WALLET,
-    SAVINGS
+    SAVINGS,
+    OTHER
 }
 
 enum class CategoryType {

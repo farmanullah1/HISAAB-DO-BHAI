@@ -11,6 +11,7 @@ import com.example.data.model.NeedEntity
 import com.example.data.model.ReceiptAttachmentEntity
 import com.example.data.model.RecurringOccurrenceEntity
 import com.example.data.model.RecurringRuleEntity
+import com.example.data.model.ReservedAmountEntity
 import com.example.data.model.TransactionEntity
 
 @Database(
@@ -21,9 +22,10 @@ import com.example.data.model.TransactionEntity
         NeedEntity::class,
         ReceiptAttachmentEntity::class,
         RecurringRuleEntity::class,
-        RecurringOccurrenceEntity::class
+        RecurringOccurrenceEntity::class,
+        ReservedAmountEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

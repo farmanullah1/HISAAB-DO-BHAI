@@ -20,6 +20,7 @@ import com.example.data.model.ReceiptAttachmentEntity
 import com.example.data.model.RecurringFrequency
 import com.example.data.model.RecurringOccurrenceEntity
 import com.example.data.model.RecurringRuleEntity
+import com.example.data.model.ReservedAmountEntity
 import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
@@ -52,34 +53,24 @@ class HisaabRepository(
     }
 
     suspend fun seedInitialDataIfNeeded() = withContext(Dispatchers.IO) {
-        val alreadySeeded = prefs.getBoolean("hisaab_seeded_v1", false)
+        val alreadySeeded = prefs.getBoolean("hisaab_seeded_v2", false)
         if (alreadySeeded) {
             checkAndGenerateRecurringOccurrences()
             return@withContext
         }
 
+        // Perform safe migration if legacy accounts (Cash & Wallet) exist
+        migrateCashAndWalletIfNeeded()
+
+        // Fresh installation: Exactly one default account named "Cash Wallet"
         if (dao.getAccountsCount() == 0) {
-            val defaultAccounts = listOf(
-                AccountEntity(
-                    name = "Cash",
-                    type = AccountType.CASH,
-                    openingBalancePaisa = 0L,
-                    colorHex = "#7C9A6B"
-                ),
-                AccountEntity(
-                    name = "Bank",
-                    type = AccountType.BANK,
-                    openingBalancePaisa = 0L,
-                    colorHex = "#5B8A8A"
-                ),
-                AccountEntity(
-                    name = "Wallet",
-                    type = AccountType.WALLET,
-                    openingBalancePaisa = 0L,
-                    colorHex = "#C67B7B"
-                )
+            val defaultAccount = AccountEntity(
+                name = "Cash Wallet",
+                type = AccountType.CASH_WALLET,
+                openingBalancePaisa = 0L,
+                colorHex = "#7C9A6B"
             )
-            dao.insertAccounts(defaultAccounts)
+            dao.insertAccount(defaultAccount)
         }
 
         if (dao.getCategoriesCount() == 0) {
@@ -102,11 +93,57 @@ class HisaabRepository(
             dao.insertCategories(defaultCategories)
         }
 
-        prefs.edit().putBoolean("hisaab_seeded_v1", true).apply()
+        prefs.edit().putBoolean("hisaab_seeded_v2", true).apply()
         checkAndGenerateRecurringOccurrences()
     }
 
+    /**
+     * Idempotent migration to safely merge separate "Cash" and "Wallet" into "Cash Wallet".
+     */
+    suspend fun migrateCashAndWalletIfNeeded() = withContext(Dispatchers.IO) {
+        val accounts = dao.getAllAccountsList()
+        val cashAcc = accounts.firstOrNull { it.name.equals("Cash", ignoreCase = true) }
+        val walletAcc = accounts.firstOrNull { it.name.equals("Wallet", ignoreCase = true) }
+
+        if (cashAcc != null && walletAcc != null) {
+            // Merge Wallet into Cash, and rename Cash to "Cash Wallet"
+            val mergedOpeningPaisa = cashAcc.openingBalancePaisa + walletAcc.openingBalancePaisa
+            val unifiedCashWallet = cashAcc.copy(
+                name = "Cash Wallet",
+                type = AccountType.CASH_WALLET,
+                openingBalancePaisa = mergedOpeningPaisa
+            )
+            dao.updateAccount(unifiedCashWallet)
+
+            // Re-point transactions
+            dao.repointTransactionsFromAccount(walletAcc.id, unifiedCashWallet.id)
+            dao.repointTransactionsToAccount(walletAcc.id, unifiedCashWallet.id)
+            dao.removeSelfTransfers(unifiedCashWallet.id)
+            dao.repointRecurringRulesAccount(walletAcc.id, unifiedCashWallet.id)
+
+            // Delete redundant wallet account
+            dao.deleteAccountById(walletAcc.id)
+        } else if (cashAcc != null && !cashAcc.name.equals("Cash Wallet", ignoreCase = true)) {
+            // Rename standalone "Cash" to "Cash Wallet"
+            dao.updateAccount(cashAcc.copy(name = "Cash Wallet", type = AccountType.CASH_WALLET))
+        } else if (walletAcc != null && !walletAcc.name.equals("Cash Wallet", ignoreCase = true)) {
+            // Rename standalone "Wallet" to "Cash Wallet"
+            dao.updateAccount(walletAcc.copy(name = "Cash Wallet", type = AccountType.CASH_WALLET))
+        }
+    }
+
     val totalBalancePaisa: Flow<Long> = dao.getTotalBalanceFlow().map { it ?: 0L }
+
+    val activeReservedTotalPaisa: Flow<Long> = dao.getActiveReservedTotalFlow().map { it ?: 0L }
+
+    val remainingBalancePaisa: Flow<Long> = combine(
+        totalBalancePaisa,
+        activeReservedTotalPaisa
+    ) { total, reserved ->
+        total - reserved
+    }.flowOn(Dispatchers.IO)
+
+    val reservedAmounts: Flow<List<ReservedAmountEntity>> = dao.getAllReservedAmountsFlow()
 
     val accountsWithBalances: Flow<List<AccountWithBalance>> = combine(
         dao.getActiveAccountsFlow(),
@@ -492,6 +529,32 @@ class HisaabRepository(
         }
     }
 
+    // --- Reserved Money ---
+    suspend fun addReservedAmount(
+        title: String,
+        amountPaisa: Long,
+        targetDateEpochMs: Long?,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        require(title.isNotBlank()) { "Reservation title cannot be blank" }
+        require(amountPaisa > 0) { "Reserved amount must be greater than zero" }
+        val reserved = ReservedAmountEntity(
+            title = title.trim(),
+            amountPaisa = amountPaisa,
+            targetDateEpochMs = targetDateEpochMs,
+            note = note.trim()
+        )
+        dao.insertReservedAmount(reserved)
+    }
+
+    suspend fun toggleReservedAmountActive(reserved: ReservedAmountEntity) = withContext(Dispatchers.IO) {
+        dao.updateReservedAmount(reserved.copy(isActive = !reserved.isActive))
+    }
+
+    suspend fun deleteReservedAmount(reserved: ReservedAmountEntity) = withContext(Dispatchers.IO) {
+        dao.deleteReservedAmount(reserved)
+    }
+
     suspend fun addNeed(
         name: String,
         expectedPricePaisa: Long?,
@@ -586,7 +649,7 @@ class HisaabRepository(
     suspend fun exportDataAsJsonFile(): File = withContext(Dispatchers.IO) {
         val root = JSONObject()
         root.put("app", "Hisaab Do Bhai")
-        root.put("version", "2.0")
+        root.put("version", "2.1")
         root.put("exportedAtEpochMs", System.currentTimeMillis())
 
         val db = HisaabDatabase.getInstance(context)
@@ -671,6 +734,24 @@ class HisaabRepository(
         }
         root.put("needs", needsArray)
 
+        // Reserved amounts
+        val reservedArray = JSONArray()
+        db.query("SELECT * FROM reserved_amounts", null).use { c ->
+            while (c.moveToNext()) {
+                val obj = JSONObject().apply {
+                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
+                    put("title", c.getString(c.getColumnIndexOrThrow("title")))
+                    put("amountPaisa", c.getLong(c.getColumnIndexOrThrow("amountPaisa")))
+                    val targetIdx = c.getColumnIndexOrThrow("targetDateEpochMs")
+                    if (!c.isNull(targetIdx)) put("targetDateEpochMs", c.getLong(targetIdx))
+                    put("note", c.getString(c.getColumnIndexOrThrow("note")))
+                    put("isActive", c.getInt(c.getColumnIndexOrThrow("isActive")) == 1)
+                }
+                reservedArray.put(obj)
+            }
+        }
+        root.put("reservedAmounts", reservedArray)
+
         val exportDir = File(context.filesDir, "exports").apply { mkdirs() }
         val exportFile = File(exportDir, "hisaab_backup_${System.currentTimeMillis()}.json")
         exportFile.writeText(root.toString(2))
@@ -693,11 +774,18 @@ class HisaabRepository(
             val accounts = mutableListOf<AccountEntity>()
             for (i in 0 until accountsArray.length()) {
                 val obj = accountsArray.getJSONObject(i)
+                val typeStr = obj.getString("type")
+                val accType = when (typeStr.uppercase()) {
+                    "CASH", "WALLET", "CASH_WALLET" -> AccountType.CASH_WALLET
+                    "BANK" -> AccountType.BANK
+                    "SAVINGS" -> AccountType.SAVINGS
+                    else -> AccountType.OTHER
+                }
                 accounts.add(
                     AccountEntity(
                         id = obj.optLong("id", 0),
                         name = obj.getString("name"),
-                        type = AccountType.valueOf(obj.getString("type")),
+                        type = accType,
                         openingBalancePaisa = obj.optLong("openingBalancePaisa", 0L),
                         colorHex = obj.optString("colorHex", "#7C9A6B"),
                         isArchived = obj.optBoolean("isArchived", false)

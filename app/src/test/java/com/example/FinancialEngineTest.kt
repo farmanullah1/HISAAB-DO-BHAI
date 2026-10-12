@@ -65,7 +65,7 @@ class FinancialEngineTest {
         val cashId = dao.insertAccount(
             AccountEntity(
                 name = "Cash",
-                type = AccountType.CASH,
+                type = AccountType.CASH_WALLET,
                 openingBalancePaisa = 100000L,
                 colorHex = "#7C9A6B"
             )
@@ -151,7 +151,7 @@ class FinancialEngineTest {
             AccountEntity(name = "Bank", type = AccountType.BANK, openingBalancePaisa = 1000000L, colorHex = "#5B8A8A")
         )
         val cashId = dao.insertAccount(
-            AccountEntity(name = "Cash", type = AccountType.CASH, openingBalancePaisa = 200000L, colorHex = "#7C9A6B")
+            AccountEntity(name = "Cash", type = AccountType.CASH_WALLET, openingBalancePaisa = 200000L, colorHex = "#7C9A6B")
         )
 
         // Combined initial: 12,000.00 PKR (1,200,000 paisa)
@@ -188,7 +188,7 @@ class FinancialEngineTest {
     @Test
     fun scenarioD_wishlistNeverAffectsLedgerBalances() = runBlocking {
         val cashId = dao.insertAccount(
-            AccountEntity(name = "Cash", type = AccountType.CASH, openingBalancePaisa = 500000L, colorHex = "#7C9A6B")
+            AccountEntity(name = "Cash", type = AccountType.CASH_WALLET, openingBalancePaisa = 500000L, colorHex = "#7C9A6B")
         )
 
         // Add a planned shopping item with 3,500.00 PKR expected price

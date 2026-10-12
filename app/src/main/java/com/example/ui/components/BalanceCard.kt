@@ -17,10 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,11 +42,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AccountEntity
 import com.example.data.model.AccountWithBalance
 import com.example.domain.Money
 import com.example.ui.theme.ClayAccentLime
 import com.example.ui.theme.ClayBorderHairline
 import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClayPanelBlue
 import com.example.ui.theme.ClaySurface
 import com.example.ui.theme.ClayTextPrimary
 import com.example.ui.theme.ClayTextSecondary
@@ -50,14 +56,19 @@ import com.example.ui.theme.ClayTextSecondary
 @Composable
 fun BalanceCard(
     totalBalancePaisa: Long,
+    remainingBalancePaisa: Long,
+    reservedPaisa: Long,
     accounts: List<AccountWithBalance>,
     selectedAccountId: Long?,
     onAccountSelected: (Long?) -> Unit,
+    onEditAccount: (AccountEntity) -> Unit,
+    onManageReserves: () -> Unit,
     privacyMode: Boolean,
     onTogglePrivacy: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = modifier
@@ -72,7 +83,7 @@ fun BalanceCard(
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            // Header Row: Label & Privacy Button & Expand toggle
+            // Header Row: Label, Info, Privacy Button & Expand toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -80,20 +91,31 @@ fun BalanceCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "TOTAL AVAILABLE BALANCE",
+                        text = "TOTAL BALANCE",
                         style = MaterialTheme.typography.labelSmall,
                         color = ClayTextSecondary,
                         letterSpacing = 0.8.sp
                     )
                     IconButton(
+                        onClick = { showInfoDialog = true },
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Balance explanation",
+                            tint = ClayTextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                    IconButton(
                         onClick = onTogglePrivacy,
-                        modifier = Modifier.size(28.dp).testTag("toggle_privacy_button")
+                        modifier = Modifier.size(26.dp).testTag("toggle_privacy_button")
                     ) {
                         Icon(
                             imageVector = if (privacyMode) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = if (privacyMode) "Reveal balances" else "Hide balances",
                             tint = ClayTextSecondary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
                 }
@@ -121,21 +143,84 @@ fun BalanceCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Display Amount
-            val balanceDisplay = if (privacyMode) "Rs. ••••••" else Money.formatPkr(totalBalancePaisa)
+            // Display Total Balance
+            val totalDisplay = if (privacyMode) "Rs. ••••••" else Money.formatPkr(totalBalancePaisa)
             Text(
-                text = balanceDisplay,
+                text = totalDisplay,
                 style = MaterialTheme.typography.displayLarge,
                 color = ClayTextPrimary,
                 maxLines = 1,
                 modifier = Modifier.testTag("total_balance_text")
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Filter Chips (Pill shaped)
+            // Remaining Balance Banner (Total - Reserved)
+            val remainingDisplay = if (privacyMode) "Rs. ••••••" else Money.formatPkr(remainingBalancePaisa)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ClayPanelBlue)
+                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "REMAINING BALANCE (AVAILABLE)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ClayTextSecondary,
+                            letterSpacing = 0.6.sp
+                        )
+                        Text(
+                            text = remainingDisplay,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = ClayTextPrimary
+                        )
+                    }
+
+                    if (reservedPaisa > 0L) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9999.dp))
+                                .background(ClayAccentLime)
+                                .clickable { onManageReserves() }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = if (privacyMode) "Reserved" else "${Money.formatPkr(reservedPaisa)} Reserved",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ClayInkDeep
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9999.dp))
+                                .background(ClaySurface)
+                                .clickable { onManageReserves() }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = "+ Reserve Funds",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ClayTextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Filter Chips (Pill shaped: All, Cash Wallet, and other user accounts)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -197,7 +282,7 @@ fun BalanceCard(
                 }
             }
 
-            // Expandable breakdown
+            // Expandable breakdown with tap-to-edit opening balance
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier
@@ -212,7 +297,9 @@ fun BalanceCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp),
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onEditAccount(item.account) }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -231,7 +318,7 @@ fun BalanceCard(
                                         color = ClayTextPrimary
                                     )
                                     Text(
-                                        text = item.account.type.name,
+                                        text = "${item.account.type.name} · Tap to edit",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = ClayTextSecondary
                                     )
@@ -248,5 +335,43 @@ fun BalanceCard(
                 }
             }
         }
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            title = {
+                Text(text = "Balance Information", style = MaterialTheme.typography.titleLarge)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "• Total Balance is the sum of all current money in your active accounts derived directly from your transactions.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ClayTextPrimary
+                    )
+                    Text(
+                        text = "• Remaining Balance is your Total Balance minus funds you have explicitly reserved for upcoming obligations.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ClayTextPrimary
+                    )
+                    Text(
+                        text = "• Cash Wallet represents all physical cash and mobile wallet money as a single unified balance.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ClayTextPrimary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showInfoDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Understood")
+                }
+            },
+            shape = RoundedCornerShape(18.dp)
+        )
     }
 }

@@ -14,6 +14,7 @@ import com.example.data.model.OccurrenceStatus
 import com.example.data.model.ReceiptAttachmentEntity
 import com.example.data.model.RecurringOccurrenceEntity
 import com.example.data.model.RecurringRuleEntity
+import com.example.data.model.ReservedAmountEntity
 import com.example.data.model.TransactionEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -37,8 +38,14 @@ interface HisaabDao {
     @Query("SELECT * FROM accounts WHERE isArchived = 0 ORDER BY id ASC")
     fun getActiveAccountsFlow(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM accounts ORDER BY id ASC")
+    suspend fun getAllAccountsList(): List<AccountEntity>
+
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun getAccountById(id: Long): AccountEntity?
+
+    @Query("SELECT * FROM accounts WHERE LOWER(name) = LOWER(:name) LIMIT 1")
+    suspend fun getAccountByName(name: String): AccountEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAccount(account: AccountEntity): Long
@@ -51,6 +58,9 @@ interface HisaabDao {
 
     @Delete
     suspend fun deleteAccount(account: AccountEntity)
+
+    @Query("DELETE FROM accounts WHERE id = :id")
+    suspend fun deleteAccountById(id: Long)
 
     @Query("""
         SELECT COALESCE(openingBalancePaisa, 0) +
@@ -81,6 +91,25 @@ interface HisaabDao {
           COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'EXPENSE' AND fromAccountId IN (SELECT id FROM accounts WHERE isArchived = 0)), 0)
     """)
     fun getTotalBalanceFlow(): Flow<Long?>
+
+    // --- Reserved Money / Remaining Balance ---
+    @Query("SELECT * FROM reserved_amounts ORDER BY id DESC")
+    fun getAllReservedAmountsFlow(): Flow<List<ReservedAmountEntity>>
+
+    @Query("SELECT * FROM reserved_amounts WHERE isActive = 1 ORDER BY id DESC")
+    fun getActiveReservedAmountsFlow(): Flow<List<ReservedAmountEntity>>
+
+    @Query("SELECT COALESCE(SUM(amountPaisa), 0) FROM reserved_amounts WHERE isActive = 1")
+    fun getActiveReservedTotalFlow(): Flow<Long?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReservedAmount(reserved: ReservedAmountEntity): Long
+
+    @Update
+    suspend fun updateReservedAmount(reserved: ReservedAmountEntity)
+
+    @Delete
+    suspend fun deleteReservedAmount(reserved: ReservedAmountEntity)
 
     // --- Categories ---
     @Query("SELECT * FROM categories WHERE type = :type ORDER BY id ASC")
@@ -128,6 +157,19 @@ interface HisaabDao {
 
     @Delete
     suspend fun deleteTransaction(transaction: TransactionEntity)
+
+    // Migration transaction re-pointing
+    @Query("UPDATE transactions SET fromAccountId = :newAccountId WHERE fromAccountId = :oldAccountId")
+    suspend fun repointTransactionsFromAccount(oldAccountId: Long, newAccountId: Long)
+
+    @Query("UPDATE transactions SET toAccountId = :newAccountId WHERE toAccountId = :oldAccountId")
+    suspend fun repointTransactionsToAccount(oldAccountId: Long, newAccountId: Long)
+
+    @Query("DELETE FROM transactions WHERE type = 'TRANSFER' AND fromAccountId = :accountId AND toAccountId = :accountId")
+    suspend fun removeSelfTransfers(accountId: Long)
+
+    @Query("UPDATE recurring_rules SET accountId = :newAccountId WHERE accountId = :oldAccountId")
+    suspend fun repointRecurringRulesAccount(oldAccountId: Long, newAccountId: Long)
 
     @Query("""
         SELECT COALESCE(SUM(amountPaisa), 0) 
