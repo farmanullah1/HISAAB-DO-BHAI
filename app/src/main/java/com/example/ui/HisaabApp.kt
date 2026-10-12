@@ -1,6 +1,5 @@
 package com.example.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,7 +30,9 @@ import com.example.ui.screens.AddTransactionScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.NeedsScreen
 import com.example.ui.screens.SettingsScreen
-import com.example.ui.theme.AccentSage
+import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClayTextSecondary
 import com.example.ui.viewmodel.HisaabViewModel
 
 @Composable
@@ -53,6 +53,10 @@ fun HisaabApp(
     val monthlySummary by viewModel.monthlySummary.collectAsStateWithLifecycle()
     val activeNeeds by viewModel.activeNeeds.collectAsStateWithLifecycle()
     val doneNeeds by viewModel.doneNeeds.collectAsStateWithLifecycle()
+    val pendingRecurring by viewModel.pendingRecurringItems.collectAsStateWithLifecycle()
+    val budgetProgressList by viewModel.budgetProgressList.collectAsStateWithLifecycle()
+    val recurringRules by viewModel.recurringRules.collectAsStateWithLifecycle()
+    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -63,7 +67,7 @@ fun HisaabApp(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 0.dp,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                     .testTag("bottom_nav_bar")
             ) {
                 NavScreen.items.forEach { screen ->
@@ -94,11 +98,11 @@ fun HisaabApp(
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = AccentSage,
-                            selectedTextColor = AccentSage,
-                            indicatorColor = AccentSage.copy(alpha = 0.15f),
-                            unselectedIconColor = MaterialTheme.colorScheme.secondary,
-                            unselectedTextColor = MaterialTheme.colorScheme.secondary
+                            selectedIconColor = ClayInkDeep,
+                            selectedTextColor = ClayInkDeep,
+                            indicatorColor = ClayAccentLime,
+                            unselectedIconColor = ClayTextSecondary,
+                            unselectedTextColor = ClayTextSecondary
                         ),
                         modifier = Modifier.testTag("nav_item_${screen.route}")
                     )
@@ -117,6 +121,12 @@ fun HisaabApp(
                     accounts = accountsWithBalances,
                     monthlySummary = monthlySummary,
                     transactions = transactions,
+                    pendingRecurring = pendingRecurring,
+                    budgets = budgetProgressList,
+                    privacyMode = privacyMode,
+                    onTogglePrivacy = { viewModel.setPrivacyMode(!privacyMode) },
+                    onConfirmRecurring = { viewModel.confirmRecurringPayment(it) },
+                    onSkipRecurring = { viewModel.skipRecurringPayment(it) },
                     onDeleteTransaction = { viewModel.deleteTransaction(it) },
                     onUndoDelete = { viewModel.undoDeleteTransaction() },
                     onNavigateToAdd = {
@@ -132,14 +142,17 @@ fun HisaabApp(
                     accounts = activeAccounts,
                     expenseCategories = expenseCategories,
                     incomeCategories = incomeCategories,
-                    onSaveExpense = { amount, fromAcc, cat, note, date ->
-                        viewModel.recordExpense(amount, fromAcc, cat, note, date)
+                    onSaveExpense = { amount, fromAcc, cat, note, date, receipt ->
+                        viewModel.recordExpense(amount, fromAcc, cat, note, date, receipt)
                     },
-                    onSaveIncome = { amount, toAcc, cat, note, date ->
-                        viewModel.recordIncome(amount, toAcc, cat, note, date)
+                    onSaveIncome = { amount, toAcc, cat, note, date, receipt ->
+                        viewModel.recordIncome(amount, toAcc, cat, note, date, receipt)
                     },
                     onSaveTransfer = { amount, fromAcc, toAcc, note, date ->
                         viewModel.recordTransfer(amount, fromAcc, toAcc, note, date)
+                    },
+                    onSaveReceiptImage = { uri ->
+                        viewModel.saveReceiptImage(uri)
                     },
                     onTransactionSaved = {
                         navController.navigate(NavScreen.Home.route) {
@@ -153,8 +166,8 @@ fun HisaabApp(
                 NeedsScreen(
                     activeNeeds = activeNeeds,
                     doneNeeds = doneNeeds,
-                    onAddNeed = { name, price, where, note ->
-                        viewModel.addNeed(name, price, where, note)
+                    onAddNeed = { name, price, where, url, note ->
+                        viewModel.addNeed(name, price, where, url, note)
                     },
                     onUpdateNeed = { viewModel.updateNeed(it) },
                     onToggleDone = { viewModel.toggleNeedDone(it) },
@@ -168,6 +181,7 @@ fun HisaabApp(
                 SettingsScreen(
                     accounts = accountsWithBalances,
                     categories = allCategories,
+                    recurringRules = recurringRules,
                     onAddAccount = { name, type, opening, color ->
                         viewModel.addAccount(name, type, opening, color)
                     },
@@ -176,7 +190,12 @@ fun HisaabApp(
                         viewModel.addCategory(name, type, icon, color, limit)
                     },
                     onUpdateCategory = { viewModel.updateCategory(it) },
-                    onExportJson = { viewModel.exportJsonFile() }
+                    onAddRecurringRule = { title, type, amount, accId, catId, freq, start, note ->
+                        viewModel.addRecurringRule(title, type, amount, accId, catId, freq, start, note)
+                    },
+                    onDeleteRecurringRule = { viewModel.deleteRecurringRule(it) },
+                    onExportJson = { viewModel.exportJsonFile() },
+                    onRestoreJson = { viewModel.restoreDataFromJson(it) }
                 )
             }
         }

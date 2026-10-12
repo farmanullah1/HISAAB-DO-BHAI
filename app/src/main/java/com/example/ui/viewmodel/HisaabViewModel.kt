@@ -1,17 +1,23 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.AccountEntity
 import com.example.data.model.AccountType
 import com.example.data.model.AccountWithBalance
+import com.example.data.model.BudgetProgressItem
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
 import com.example.data.model.MonthlySummary
 import com.example.data.model.NeedEntity
+import com.example.data.model.PendingRecurringItem
+import com.example.data.model.RecurringFrequency
+import com.example.data.model.RecurringRuleEntity
 import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
+import com.example.data.model.TransactionType
 import com.example.data.repository.HisaabRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +37,13 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.seedInitialDataIfNeeded()
         }
+    }
+
+    val privacyMode: StateFlow<Boolean> = repository.privacyMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun setPrivacyMode(enabled: Boolean) {
+        repository.setPrivacyMode(enabled)
     }
 
     val totalBalancePaisa: StateFlow<Long> = repository.totalBalancePaisa
@@ -64,15 +77,38 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
     val doneNeeds: StateFlow<List<NeedEntity>> = repository.doneNeeds
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun recordExpense(amountPaisa: Long, fromAccountId: Long, categoryId: Long, note: String, dateEpochMs: Long) {
+    val budgetProgressList: StateFlow<List<BudgetProgressItem>> = repository.budgetProgressList
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val pendingRecurringItems: StateFlow<List<PendingRecurringItem>> = repository.pendingRecurringItems
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val recurringRules: StateFlow<List<RecurringRuleEntity>> = repository.recurringRules
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun recordExpense(
+        amountPaisa: Long,
+        fromAccountId: Long,
+        categoryId: Long,
+        note: String,
+        dateEpochMs: Long,
+        receiptPath: String? = null
+    ) {
         viewModelScope.launch {
-            repository.recordExpense(amountPaisa, fromAccountId, categoryId, note, dateEpochMs)
+            repository.recordExpense(amountPaisa, fromAccountId, categoryId, note, dateEpochMs, receiptPath)
         }
     }
 
-    fun recordIncome(amountPaisa: Long, toAccountId: Long, categoryId: Long, note: String, dateEpochMs: Long) {
+    fun recordIncome(
+        amountPaisa: Long,
+        toAccountId: Long,
+        categoryId: Long,
+        note: String,
+        dateEpochMs: Long,
+        receiptPath: String? = null
+    ) {
         viewModelScope.launch {
-            repository.recordIncome(amountPaisa, toAccountId, categoryId, note, dateEpochMs)
+            repository.recordIncome(amountPaisa, toAccountId, categoryId, note, dateEpochMs, receiptPath)
         }
     }
 
@@ -97,9 +133,46 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun addNeed(name: String, pricePaisa: Long?, where: String, note: String) {
+    suspend fun saveReceiptImage(uri: Uri): String? {
+        return repository.saveReceiptImage(uri)
+    }
+
+    fun confirmRecurringPayment(occurrenceId: Long) {
         viewModelScope.launch {
-            repository.addNeed(name, pricePaisa, where, note)
+            repository.confirmRecurringPayment(occurrenceId)
+        }
+    }
+
+    fun skipRecurringPayment(occurrenceId: Long) {
+        viewModelScope.launch {
+            repository.skipRecurringPayment(occurrenceId)
+        }
+    }
+
+    fun addRecurringRule(
+        title: String,
+        type: TransactionType,
+        amountPaisa: Long,
+        accountId: Long,
+        categoryId: Long,
+        frequency: RecurringFrequency,
+        startDateEpochMs: Long,
+        note: String
+    ) {
+        viewModelScope.launch {
+            repository.addRecurringRule(title, type, amountPaisa, accountId, categoryId, frequency, startDateEpochMs, note)
+        }
+    }
+
+    fun deleteRecurringRule(rule: RecurringRuleEntity) {
+        viewModelScope.launch {
+            repository.deleteRecurringRule(rule)
+        }
+    }
+
+    fun addNeed(name: String, pricePaisa: Long?, where: String, externalUrl: String, note: String) {
+        viewModelScope.launch {
+            repository.addNeed(name, pricePaisa, where, externalUrl, note)
         }
     }
 
@@ -162,5 +235,9 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
 
     suspend fun exportJsonFile(): File {
         return repository.exportDataAsJsonFile()
+    }
+
+    suspend fun restoreDataFromJson(jsonString: String): Result<String> {
+        return repository.restoreDataFromJson(jsonString)
     }
 }

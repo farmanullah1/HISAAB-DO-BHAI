@@ -8,6 +8,9 @@ import androidx.room.TypeConverters
 import com.example.data.model.AccountEntity
 import com.example.data.model.CategoryEntity
 import com.example.data.model.NeedEntity
+import com.example.data.model.ReceiptAttachmentEntity
+import com.example.data.model.RecurringOccurrenceEntity
+import com.example.data.model.RecurringRuleEntity
 import com.example.data.model.TransactionEntity
 
 @Database(
@@ -15,9 +18,12 @@ import com.example.data.model.TransactionEntity
         AccountEntity::class,
         CategoryEntity::class,
         TransactionEntity::class,
-        NeedEntity::class
+        NeedEntity::class,
+        ReceiptAttachmentEntity::class,
+        RecurringRuleEntity::class,
+        RecurringOccurrenceEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -35,7 +41,9 @@ abstract class HisaabDatabase : RoomDatabase() {
                     context.applicationContext,
                     HisaabDatabase::class.java,
                     "hisaab_database.db"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

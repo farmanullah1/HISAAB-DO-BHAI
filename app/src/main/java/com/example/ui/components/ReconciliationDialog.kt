@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
@@ -35,9 +36,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.model.AccountWithBalance
 import com.example.domain.Money
-import com.example.ui.theme.ExpenseTerracotta
-import com.example.ui.theme.IncomeGreen
-import com.example.ui.theme.WarningAmber
+import com.example.ui.theme.SemanticExpense
+import com.example.ui.theme.SemanticIncome
+import com.example.ui.theme.SemanticWarning
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -145,10 +146,10 @@ fun ReconciliationDialog(
                     val actualPaisa = Money.parsePaisa(enteredActualText)
                     if (actualPaisa != null) {
                         val difference = actualPaisa - acc.balancePaisa
-                        val diffColor = when {
-                            difference == 0L -> IncomeGreen
-                            difference > 0L -> WarningAmber
-                            else -> ExpenseTerracotta
+                        val diffColor: Color = when {
+                            difference == 0L -> SemanticIncome
+                            difference > 0L -> SemanticWarning
+                            else -> SemanticExpense
                         }
 
                         Box(

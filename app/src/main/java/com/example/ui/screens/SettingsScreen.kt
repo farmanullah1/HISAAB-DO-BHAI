@@ -22,14 +22,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Balance
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -51,17 +53,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import com.example.data.model.AccountEntity
 import com.example.data.model.AccountType
 import com.example.data.model.AccountWithBalance
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
+import com.example.data.model.RecurringFrequency
+import com.example.data.model.RecurringRuleEntity
+import com.example.data.model.TransactionType
 import com.example.domain.Money
 import com.example.ui.components.AddAccountDialog
 import com.example.ui.components.AddCategoryDialog
+import com.example.ui.components.AddRecurringRuleDialog
 import com.example.ui.components.CategoryIconHelper
 import com.example.ui.components.ReconciliationDialog
+import com.example.ui.components.RestoreDataDialog
+import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayBorderHairline
+import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClaySurface
+import com.example.ui.theme.ClayTextPrimary
+import com.example.ui.theme.ClayTextSecondary
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -69,11 +81,24 @@ import java.io.File
 fun SettingsScreen(
     accounts: List<AccountWithBalance>,
     categories: List<CategoryEntity>,
+    recurringRules: List<RecurringRuleEntity>,
     onAddAccount: (name: String, type: AccountType, openingPaisa: Long, colorHex: String) -> Unit,
     onUpdateAccount: (AccountEntity) -> Unit,
     onAddCategory: (name: String, type: CategoryType, iconKey: String, colorHex: String, limitPaisa: Long?) -> Unit,
     onUpdateCategory: (CategoryEntity) -> Unit,
+    onAddRecurringRule: (
+        title: String,
+        type: TransactionType,
+        amountPaisa: Long,
+        accountId: Long,
+        categoryId: Long,
+        frequency: RecurringFrequency,
+        startDateEpochMs: Long,
+        note: String
+    ) -> Unit,
+    onDeleteRecurringRule: (RecurringRuleEntity) -> Unit,
     onExportJson: suspend () -> File,
+    onRestoreJson: suspend (String) -> Result<String>,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -86,7 +111,9 @@ fun SettingsScreen(
     var showAddCategoryDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
 
+    var showAddRecurringDialog by remember { mutableStateOf(false) }
     var showReconciliationDialog by remember { mutableStateOf(false) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
     var isExporting by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -99,29 +126,29 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .testTag("settings_screen"),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // Screen Header
             item {
                 Column {
                     Text(
-                        text = "Settings & Data",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onBackground
+                        text = "Settings & Ledger Management",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = ClayTextPrimary
                     )
                     Text(
-                        text = "Manage your accounts, categories, and ledger export",
+                        text = "Accounts, categories, recurring payments, and backup",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = ClayTextSecondary
                     )
                 }
             }
 
             // Accounts Section
             item {
-                SectionCard(
-                    title = "ACCOUNTS & BALANCES",
+                ClaySectionCard(
+                    title = "ACCOUNTS & WALLETS",
                     actionTitle = "+ Add Account",
                     onAction = { showAddAccountDialog = true }
                 ) {
@@ -129,15 +156,15 @@ fun SettingsScreen(
                         accounts.forEach { item ->
                             val color = runCatching {
                                 Color(android.graphics.Color.parseColor(item.account.colorHex))
-                            }.getOrDefault(MaterialTheme.colorScheme.primary)
+                            }.getOrDefault(ClayInkDeep)
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ClaySurface)
                                     .clickable { editingAccount = item.account }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -153,12 +180,12 @@ fun SettingsScreen(
                                         Text(
                                             text = item.account.name,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = ClayTextPrimary
                                         )
                                         Text(
                                             text = item.account.type.name,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.secondary
+                                            color = ClayTextSecondary
                                         )
                                     }
                                 }
@@ -166,7 +193,7 @@ fun SettingsScreen(
                                 Text(
                                     text = Money.formatPkr(item.balancePaisa),
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = ClayTextPrimary
                                 )
                             }
                         }
@@ -176,7 +203,7 @@ fun SettingsScreen(
 
             // Categories Section
             item {
-                SectionCard(
+                ClaySectionCard(
                     title = "CATEGORIES & BUDGET LIMITS",
                     actionTitle = "+ Add Category",
                     onAction = { showAddCategoryDialog = true }
@@ -185,13 +212,13 @@ fun SettingsScreen(
                         categories.forEach { cat ->
                             val color = runCatching {
                                 Color(android.graphics.Color.parseColor(cat.colorHex))
-                            }.getOrDefault(MaterialTheme.colorScheme.primary)
+                            }.getOrDefault(ClayInkDeep)
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ClaySurface)
                                     .clickable { editingCategory = cat }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -201,14 +228,14 @@ fun SettingsScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(28.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(color.copy(alpha = 0.2f)),
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(ClayAccentLime.copy(alpha = 0.5f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = CategoryIconHelper.getIcon(cat.iconKey),
                                             contentDescription = null,
-                                            tint = color,
+                                            tint = ClayInkDeep,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -217,12 +244,12 @@ fun SettingsScreen(
                                         Text(
                                             text = cat.name,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = ClayTextPrimary
                                         )
                                         Text(
                                             text = cat.type.name,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.secondary
+                                            color = ClayTextSecondary
                                         )
                                     }
                                 }
@@ -231,8 +258,70 @@ fun SettingsScreen(
                                     Text(
                                         text = "Limit: ${Money.formatPkr(limit)}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = ClayTextSecondary
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Recurring Rules Section
+            item {
+                ClaySectionCard(
+                    title = "RECURRING RULES & BILLS",
+                    actionTitle = "+ New Rule",
+                    onAction = { showAddRecurringDialog = true }
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (recurringRules.isEmpty()) {
+                            Text(
+                                text = "No recurring rules set. Add rent, salary, or utility schedules for automated due reminders.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ClayTextSecondary
+                            )
+                        } else {
+                            recurringRules.forEach { rule ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(ClaySurface)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Alarm,
+                                            contentDescription = null,
+                                            tint = ClayInkDeep,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = rule.title,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = ClayTextPrimary
+                                            )
+                                            Text(
+                                                text = "${rule.frequency.name.lowercase().replaceFirstChar { it.uppercase() }} · ${Money.formatPkr(rule.amountPaisa)}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = ClayTextSecondary
+                                            )
+                                        }
+                                    }
+
+                                    IconButton(onClick = { onDeleteRecurringRule(rule) }) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = "Delete rule",
+                                            tint = ClayTextSecondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -242,21 +331,21 @@ fun SettingsScreen(
 
             // Financial Integrity & Reconciliation
             item {
-                SectionCard(title = "INTEGRITY & TOOLS") {
+                ClaySectionCard(title = "FINANCIAL INTEGRITY TOOLS") {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ClaySurface)
                                 .clickable { showReconciliationDialog = true }
-                                .padding(12.dp),
+                                .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Balance,
                                 contentDescription = "Reconciliation",
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = ClayInkDeep,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -264,12 +353,12 @@ fun SettingsScreen(
                                 Text(
                                     text = "Account Reconciliation Tool",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = ClayTextPrimary
                                 )
                                 Text(
-                                    text = "Compare physical wallet/statement with Hisaab balance",
+                                    text = "Compare physical wallet/statement with Hisaab balance without automatic distortion",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary
+                                    color = ClayTextSecondary
                                 )
                             }
                         }
@@ -277,93 +366,98 @@ fun SettingsScreen(
                 }
             }
 
-            // Data Export
+            // Data Export & Restore Section
             item {
-                SectionCard(title = "DATA & EXPORT") {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ClaySectionCard(title = "DATA BACKUP & RESTORE") {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = "Export your entire ledger (accounts, categories, transactions, and needs) as a standard JSON archive.",
+                            text = "Export your entire ledger (accounts, categories, transactions, needs, rules) as a validated JSON file, or restore from an existing backup.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = ClayTextSecondary
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Button(
-                            onClick = {
-                                if (isExporting) return@Button
-                                isExporting = true
-                                scope.launch {
-                                    try {
-                                        val file = onExportJson()
-                                        isExporting = false
-                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                            type = "application/json"
-                                            putExtra(Intent.EXTRA_SUBJECT, "Hisaab Backup JSON")
-                                            putExtra(Intent.EXTRA_TEXT, "Hisaab JSON Backup file created on ${file.name}")
-                                        }
-                                        context.startActivity(
-                                            Intent.createChooser(shareIntent, "Save or share backup")
-                                        )
-                                        snackbarHostState.showSnackbar("Backup created: ${file.name}")
-                                    } catch (e: Exception) {
-                                        isExporting = false
-                                        snackbarHostState.showSnackbar("Export failed: ${e.message}")
-                                    }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("export_json_button")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.FileDownload,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (isExporting) "Exporting..." else "Export as JSON")
+                            Button(
+                                onClick = {
+                                    if (isExporting) return@Button
+                                    isExporting = true
+                                    scope.launch {
+                                        try {
+                                            val file = onExportJson()
+                                            isExporting = false
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "application/json"
+                                                putExtra(Intent.EXTRA_SUBJECT, "Hisaab Backup JSON")
+                                                putExtra(Intent.EXTRA_TEXT, "Hisaab JSON Backup file created on ${file.name}")
+                                            }
+                                            context.startActivity(
+                                                Intent.createChooser(shareIntent, "Save or share backup")
+                                            )
+                                            snackbarHostState.showSnackbar("Backup created: ${file.name}")
+                                        } catch (e: Exception) {
+                                            isExporting = false
+                                            snackbarHostState.showSnackbar("Export failed: ${e.message}")
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ClayInkDeep,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f).testTag("export_json_button")
+                            ) {
+                                Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (isExporting) "Exporting..." else "Export JSON")
+                            }
+
+                            OutlinedButton(
+                                onClick = { showRestoreDialog = true },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f).testTag("restore_json_button")
+                            ) {
+                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Restore JSON")
+                            }
                         }
                     }
                 }
             }
 
-            // About Hisaab Section
+            // About Hisaab Do Bhai
             item {
-                SectionCard(title = "ABOUT HISAAB") {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ClaySectionCard(title = "ABOUT HISAAB DO BHAI") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Security,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
+                                tint = ClayInkDeep,
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "100% Offline & Local Ledger",
+                                text = "100% Offline & Local Privacy",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = ClayTextPrimary
                             )
                         }
 
                         Text(
-                            text = "Hisaab (Urdu for 'Account') operates entirely offline with zero cloud telemetry, no logins, and no trackers. All financial figures are stored strictly on your device using exact integer minor units.",
+                            text = "Hisaab Do Bhai operates entirely on your device with no accounts, no telemetry, and no external AI dependencies. All monetary math uses exact integer paisa arithmetic, and account balances are derived deterministically from the ledger.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = ClayTextSecondary
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
                         Text(
-                            text = "Version 1.0 · Pakistani Rupee (PKR)",
+                            text = "Version 2.0 (Clay Edition) · Pakistani Rupee (PKR)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                            color = ClayTextSecondary.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -434,16 +528,45 @@ fun SettingsScreen(
         )
     }
 
+    if (showAddRecurringDialog) {
+        AddRecurringRuleDialog(
+            accounts = accounts.map { it.account },
+            categories = categories,
+            onDismiss = { showAddRecurringDialog = false },
+            onSave = { title, type, amount, accId, catId, freq, start, note ->
+                onAddRecurringRule(title, type, amount, accId, catId, freq, start, note)
+                showAddRecurringDialog = false
+            }
+        )
+    }
+
     if (showReconciliationDialog) {
         ReconciliationDialog(
             accounts = accounts,
             onDismiss = { showReconciliationDialog = false }
         )
     }
+
+    if (showRestoreDialog) {
+        RestoreDataDialog(
+            onDismiss = { showRestoreDialog = false },
+            onRestore = { json ->
+                scope.launch {
+                    val result = onRestoreJson(json)
+                    showRestoreDialog = false
+                    if (result.isSuccess) {
+                        snackbarHostState.showSnackbar("Restore successful: ${result.getOrNull()}")
+                    } else {
+                        snackbarHostState.showSnackbar("Restore error: ${result.exceptionOrNull()?.message}")
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
-private fun SectionCard(
+private fun ClaySectionCard(
     title: String,
     actionTitle: String? = null,
     onAction: (() -> Unit)? = null,
@@ -452,15 +575,15 @@ private fun SectionCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(18.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -470,7 +593,7 @@ private fun SectionCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = ClayTextSecondary,
                     letterSpacing = 0.8.sp
                 )
 
@@ -478,13 +601,13 @@ private fun SectionCard(
                     Text(
                         text = actionTitle,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = ClayInkDeep,
                         modifier = Modifier.clickable { onAction() }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             content()
         }

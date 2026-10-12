@@ -1,6 +1,6 @@
 {
-  "name": "Hisaab",
-  "description": "Quiet Ledger personal finance and money tracker for managing accounts, expenses, income, transfers, and needs.",
+  "name": "Hisaab Do Bhai",
+  "description": "Quiet Ledger personal finance and shopping planner with Clay-inspired design. 100% offline-first and private.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

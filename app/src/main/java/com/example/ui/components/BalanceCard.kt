@@ -19,7 +19,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,11 +35,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AccountWithBalance
 import com.example.domain.Money
+import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayBorderHairline
+import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClaySurface
+import com.example.ui.theme.ClayTextPrimary
+import com.example.ui.theme.ClayTextSecondary
 
 @Composable
 fun BalanceCard(
@@ -44,6 +53,8 @@ fun BalanceCard(
     accounts: List<AccountWithBalance>,
     selectedAccountId: Long?,
     onAccountSelected: (Long?) -> Unit,
+    privacyMode: Boolean,
+    onTogglePrivacy: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -51,32 +62,46 @@ fun BalanceCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp)),
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
+            // Header Row: Label & Privacy Button & Expand toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "TOTAL AVAILABLE BALANCE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    letterSpacing = 1.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "TOTAL AVAILABLE BALANCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ClayTextSecondary,
+                        letterSpacing = 0.8.sp
+                    )
+                    IconButton(
+                        onClick = onTogglePrivacy,
+                        modifier = Modifier.size(28.dp).testTag("toggle_privacy_button")
+                    ) {
+                        Icon(
+                            imageVector = if (privacyMode) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (privacyMode) "Reveal balances" else "Hide balances",
+                            tint = ClayTextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
 
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clip(RoundedCornerShape(9999.dp))
+                        .background(ClaySurface)
                         .clickable { expanded = !expanded }
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -84,55 +109,55 @@ fun BalanceCard(
                     Text(
                         text = "${accounts.size} Accounts",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = ClayTextSecondary
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = "Toggle accounts list",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.secondary
+                        tint = ClayTextSecondary
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Display Amount
+            val balanceDisplay = if (privacyMode) "Rs. ••••••" else Money.formatPkr(totalBalancePaisa)
             Text(
-                text = Money.formatPkr(totalBalancePaisa),
+                text = balanceDisplay,
                 style = MaterialTheme.typography.displayLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
+                color = ClayTextPrimary,
+                maxLines = 1,
+                modifier = Modifier.testTag("total_balance_text")
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // Quick Account Filter Chips
+            // Filter Chips (Pill shaped)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // All Accounts chip
                 val isAllSelected = selectedAccountId == null
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isAllSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
+                        .clip(RoundedCornerShape(9999.dp))
+                        .background(if (isAllSelected) ClayAccentLime else ClaySurface)
                         .border(
                             width = 1.dp,
-                            color = if (isAllSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
+                            color = if (isAllSelected) ClayInkDeep.copy(alpha = 0.3f) else Color.Transparent,
+                            shape = RoundedCornerShape(9999.dp)
                         )
                         .clickable { onAccountSelected(null) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .testTag("filter_all_accounts")
                 ) {
                     Text(
                         text = "All",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ClayInkDeep
                     )
                 }
 
@@ -140,22 +165,20 @@ fun BalanceCard(
                     val isSelected = selectedAccountId == accWithBal.account.id
                     val accountColor = runCatching {
                         Color(android.graphics.Color.parseColor(accWithBal.account.colorHex))
-                    }.getOrDefault(MaterialTheme.colorScheme.primary)
+                    }.getOrDefault(ClayInkDeep)
 
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
+                            .clip(RoundedCornerShape(9999.dp))
+                            .background(if (isSelected) ClayAccentLime else ClaySurface)
                             .border(
                                 width = 1.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (isSelected) ClayInkDeep.copy(alpha = 0.3f) else Color.Transparent,
+                                shape = RoundedCornerShape(9999.dp)
                             )
                             .clickable { onAccountSelected(if (isSelected) null else accWithBal.account.id) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .testTag("filter_account_${accWithBal.account.id}"),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -167,13 +190,14 @@ fun BalanceCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = accWithBal.account.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.labelMedium,
+                            color = ClayInkDeep
                         )
                     }
                 }
             }
 
+            // Expandable breakdown
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier
@@ -183,7 +207,7 @@ fun BalanceCard(
                     accounts.forEach { item ->
                         val color = runCatching {
                             Color(android.graphics.Color.parseColor(item.account.colorHex))
-                        }.getOrDefault(MaterialTheme.colorScheme.primary)
+                        }.getOrDefault(ClayInkDeep)
 
                         Row(
                             modifier = Modifier
@@ -204,20 +228,20 @@ fun BalanceCard(
                                     Text(
                                         text = item.account.name,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = ClayTextPrimary
                                     )
                                     Text(
                                         text = item.account.type.name,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = ClayTextSecondary
                                     )
                                 }
                             }
 
                             Text(
-                                text = Money.formatPkr(item.balancePaisa),
+                                text = if (privacyMode) "••••••" else Money.formatPkr(item.balancePaisa),
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = ClayTextPrimary
                             )
                         }
                     }

@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -50,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,13 +61,20 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.NeedEntity
 import com.example.domain.Money
 import com.example.ui.components.AddNeedDialog
+import com.example.ui.components.ClayEmptyState
+import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayBorderHairline
+import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClaySurface
+import com.example.ui.theme.ClayTextPrimary
+import com.example.ui.theme.ClayTextSecondary
 import kotlinx.coroutines.launch
 
 @Composable
 fun NeedsScreen(
     activeNeeds: List<NeedEntity>,
     doneNeeds: List<NeedEntity>,
-    onAddNeed: (name: String, pricePaisa: Long?, where: String, note: String) -> Unit,
+    onAddNeed: (name: String, pricePaisa: Long?, where: String, externalUrl: String, note: String) -> Unit,
     onUpdateNeed: (NeedEntity) -> Unit,
     onToggleDone: (NeedEntity) -> Unit,
     onDeleteNeed: (Long) -> Unit,
@@ -72,6 +82,7 @@ fun NeedsScreen(
     onClearAllDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -87,8 +98,8 @@ fun NeedsScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = ClayAccentLime,
+                contentColor = ClayInkDeep,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.testTag("add_need_fab")
             ) {
@@ -106,7 +117,7 @@ fun NeedsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .testTag("needs_list"),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header Card
@@ -114,10 +125,10 @@ fun NeedsScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp)),
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(
                         modifier = Modifier
@@ -125,26 +136,26 @@ fun NeedsScreen(
                             .padding(20.dp)
                     ) {
                         Text(
-                            text = "WHAT I NEED",
+                            text = "WHAT I NEED · SHOPPING PLANNER",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                            letterSpacing = 1.sp
+                            color = ClayTextSecondary,
+                            letterSpacing = 0.8.sp
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
                             text = Money.formatPkr(totalExpectedPaisa),
-                            style = MaterialTheme.typography.displayMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.displayLarge,
+                            color = ClayTextPrimary
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = "${activeNeeds.size} active items planned",
+                            text = "Estimated total for ${activeNeeds.size} active items (independent of ledger balances)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = ClayTextSecondary
                         )
                     }
                 }
@@ -153,9 +164,9 @@ fun NeedsScreen(
             // Section Label
             item {
                 Text(
-                    text = "ACTIVE WISHLIST",
+                    text = "ACTIVE ITEMS",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = ClayTextSecondary,
                     letterSpacing = 0.8.sp
                 )
             }
@@ -163,36 +174,13 @@ fun NeedsScreen(
             // Empty state for active needs
             if (activeNeeds.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Checklist,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Your wishlist is empty",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Keep track of items you plan to purchase soon.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
-                    }
+                    ClayEmptyState(
+                        icon = Icons.Default.Checklist,
+                        title = "Nothing on your list yet",
+                        description = "Add things you're planning to buy. What I Need tracks items and estimated costs without affecting your real account balances.",
+                        actionTitle = "+ Add Item",
+                        onAction = { showAddDialog = true }
+                    )
                 }
             } else {
                 items(
@@ -203,6 +191,13 @@ fun NeedsScreen(
                         need = need,
                         onToggle = { onToggleDone(need) },
                         onEdit = { editingNeed = need },
+                        onOpenUrl = { url ->
+                            runCatching {
+                                val fixedUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) "https://$url" else url
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fixedUrl))
+                                context.startActivity(intent)
+                            }
+                        },
                         onDelete = {
                             val needId = need.id
                             onDeleteNeed(needId)
@@ -229,7 +224,7 @@ fun NeedsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), RoundedCornerShape(14.dp)),
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp)),
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(14.dp)
                     ) {
@@ -243,15 +238,15 @@ fun NeedsScreen(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "Purchased / Done (${doneNeeds.size})",
+                                        text = "Purchased / Completed (${doneNeeds.size})",
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.secondary
+                                        color = ClayTextSecondary
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Icon(
                                         imageVector = if (doneSectionExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                         contentDescription = "Toggle done items",
-                                        tint = MaterialTheme.colorScheme.secondary,
+                                        tint = ClayTextSecondary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -275,6 +270,7 @@ fun NeedsScreen(
                                             need = item,
                                             onToggle = { onToggleDone(item) },
                                             onEdit = { editingNeed = item },
+                                            onOpenUrl = null,
                                             onDelete = { onDeleteNeed(item.id) }
                                         )
                                     }
@@ -286,7 +282,7 @@ fun NeedsScreen(
             }
 
             item {
-                Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(70.dp))
             }
         }
     }
@@ -295,8 +291,8 @@ fun NeedsScreen(
         AddNeedDialog(
             initialNeed = null,
             onDismiss = { showAddDialog = false },
-            onSave = { name, price, where, note ->
-                onAddNeed(name, price, where, note)
+            onSave = { name, price, where, url, note ->
+                onAddNeed(name, price, where, url, note)
                 showAddDialog = false
             }
         )
@@ -306,12 +302,13 @@ fun NeedsScreen(
         AddNeedDialog(
             initialNeed = need,
             onDismiss = { editingNeed = null },
-            onSave = { name, price, where, note ->
+            onSave = { name, price, where, url, note ->
                 onUpdateNeed(
                     need.copy(
                         name = name,
                         expectedPricePaisa = price,
                         whereToGet = where,
+                        externalUrl = url,
                         note = note
                     )
                 )
@@ -326,6 +323,7 @@ private fun NeedItemRow(
     need: NeedEntity,
     onToggle: () -> Unit,
     onEdit: () -> Unit,
+    onOpenUrl: ((String) -> Unit)? = null,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -333,39 +331,40 @@ private fun NeedItemRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp)),
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = need.isDone,
                 onCheckedChange = { onToggle() },
                 colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.secondary
+                    checkedColor = ClayAccentLime,
+                    checkmarkColor = ClayInkDeep,
+                    uncheckedColor = ClayTextSecondary
                 ),
                 modifier = Modifier.testTag("need_checkbox_${need.id}")
             )
 
             Column(
-                modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
             ) {
                 Text(
                     text = need.name,
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (need.isDone) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+                    color = if (need.isDone) ClayTextSecondary else ClayTextPrimary,
                     textDecoration = if (need.isDone) TextDecoration.LineThrough else TextDecoration.None,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                if (need.whereToGet.isNotBlank() || need.note.isNotBlank()) {
+                if (need.whereToGet.isNotBlank() || need.note.isNotBlank() || need.externalUrl.isNotBlank()) {
                     val sub = buildString {
                         if (need.whereToGet.isNotBlank()) append("At: ${need.whereToGet} ")
                         if (need.note.isNotBlank()) append("· ${need.note}")
@@ -373,7 +372,7 @@ private fun NeedItemRow(
                     Text(
                         text = sub,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = ClayTextSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -383,16 +382,27 @@ private fun NeedItemRow(
             if (need.expectedPricePaisa != null) {
                 Text(
                     text = Money.formatPkr(need.expectedPricePaisa),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (need.isDone) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (need.isDone) ClayTextSecondary else ClayTextPrimary
                 )
+            }
+
+            if (need.externalUrl.isNotBlank() && onOpenUrl != null) {
+                IconButton(onClick = { onOpenUrl(need.externalUrl) }) {
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = "Open shop link",
+                        tint = ClayTextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
             IconButton(onClick = onEdit) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Edit need",
-                    tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                    tint = ClayTextSecondary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -401,7 +411,7 @@ private fun NeedItemRow(
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = "Delete need",
-                    tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                    tint = ClayTextSecondary,
                     modifier = Modifier.size(18.dp)
                 )
             }

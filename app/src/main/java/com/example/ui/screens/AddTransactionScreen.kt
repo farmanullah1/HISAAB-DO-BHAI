@@ -1,6 +1,11 @@
 package com.example.ui.screens
 
 import android.app.DatePickerDialog
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,11 +26,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -57,8 +65,15 @@ import com.example.data.model.TransactionType
 import com.example.domain.Money
 import com.example.ui.components.CategoryIconHelper
 import com.example.ui.components.NumericKeypad
-import com.example.ui.theme.ExpenseTerracotta
-import com.example.ui.theme.IncomeGreen
+import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayAccentLimeDeep
+import com.example.ui.theme.ClayBorderHairline
+import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClaySurface
+import com.example.ui.theme.ClayTextPrimary
+import com.example.ui.theme.ClayTextSecondary
+import com.example.ui.theme.SemanticExpense
+import com.example.ui.theme.SemanticIncome
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -70,9 +85,10 @@ fun AddTransactionScreen(
     accounts: List<AccountEntity>,
     expenseCategories: List<CategoryEntity>,
     incomeCategories: List<CategoryEntity>,
-    onSaveExpense: (amountPaisa: Long, fromAccountId: Long, categoryId: Long, note: String, dateEpochMs: Long) -> Unit,
-    onSaveIncome: (amountPaisa: Long, toAccountId: Long, categoryId: Long, note: String, dateEpochMs: Long) -> Unit,
+    onSaveExpense: (amountPaisa: Long, fromAccountId: Long, categoryId: Long, note: String, dateEpochMs: Long, receiptPath: String?) -> Unit,
+    onSaveIncome: (amountPaisa: Long, toAccountId: Long, categoryId: Long, note: String, dateEpochMs: Long, receiptPath: String?) -> Unit,
     onSaveTransfer: (amountPaisa: Long, fromAccountId: Long, toAccountId: Long, note: String, dateEpochMs: Long) -> Unit,
+    onSaveReceiptImage: suspend (Uri) -> String?,
     onTransactionSaved: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -98,6 +114,20 @@ fun AddTransactionScreen(
     }
     var note by remember { mutableStateOf("") }
     var selectedDateEpochMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var receiptFilePath by remember { mutableStateOf<String?>(null) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedImageUri = uri
+            scope.launch {
+                val savedPath = onSaveReceiptImage(uri)
+                receiptFilePath = savedPath
+            }
+        }
+    }
 
     val amountPaisa by remember {
         derivedStateOf { Money.keypadBufferToPaisa(keypadBuffer) }
@@ -149,12 +179,13 @@ fun AddTransactionScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Segmented Control (Expense | Income | Transfer)
+            // Segmented Control (Pill-shaped Clay style)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clip(RoundedCornerShape(9999.dp))
+                    .background(ClaySurface)
+                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(9999.dp))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -165,22 +196,12 @@ fun AddTransactionScreen(
                         TransactionType.INCOME -> "Income"
                         TransactionType.TRANSFER -> "Transfer"
                     }
-                    val selectedBg = when (type) {
-                        TransactionType.EXPENSE -> ExpenseTerracotta.copy(alpha = 0.25f)
-                        TransactionType.INCOME -> IncomeGreen.copy(alpha = 0.25f)
-                        TransactionType.TRANSFER -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                    }
-                    val selectedText = when (type) {
-                        TransactionType.EXPENSE -> ExpenseTerracotta
-                        TransactionType.INCOME -> IncomeGreen
-                        TransactionType.TRANSFER -> MaterialTheme.colorScheme.primary
-                    }
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSelected) selectedBg else Color.Transparent)
+                            .clip(RoundedCornerShape(9999.dp))
+                            .background(if (isSelected) ClayAccentLime else Color.Transparent)
                             .clickable {
                                 selectedType = type
                                 if (type == TransactionType.EXPENSE) {
@@ -196,7 +217,7 @@ fun AddTransactionScreen(
                         Text(
                             text = label,
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (isSelected) selectedText else MaterialTheme.colorScheme.secondary
+                            color = ClayInkDeep
                         )
                     }
                 }
@@ -204,11 +225,11 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Amount Display
+            // Amount Display with tight tracking
             Text(
                 text = "AMOUNT (PKR)",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
+                color = ClayTextSecondary,
                 letterSpacing = 1.sp
             )
 
@@ -219,9 +240,9 @@ fun AddTransactionScreen(
                 text = "Rs. $displayAmountText",
                 style = MaterialTheme.typography.displayMedium,
                 color = when (selectedType) {
-                    TransactionType.EXPENSE -> ExpenseTerracotta
-                    TransactionType.INCOME -> IncomeGreen
-                    TransactionType.TRANSFER -> MaterialTheme.colorScheme.onBackground
+                    TransactionType.EXPENSE -> SemanticExpense
+                    TransactionType.INCOME -> SemanticIncome
+                    TransactionType.TRANSFER -> ClayTextPrimary
                 },
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("live_amount_display")
@@ -229,7 +250,7 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Account selection
+            // Contextual Accounts Selection
             when (selectedType) {
                 TransactionType.EXPENSE -> {
                     AccountChipGroup(
@@ -273,7 +294,7 @@ fun AddTransactionScreen(
                     Text(
                         text = "Category",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = ClayTextSecondary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
@@ -287,36 +308,33 @@ fun AddTransactionScreen(
                             val isSelected = selectedCategoryId == cat.id
                             val catColor = runCatching {
                                 Color(android.graphics.Color.parseColor(cat.colorHex))
-                            }.getOrDefault(MaterialTheme.colorScheme.primary)
+                            }.getOrDefault(ClayInkDeep)
 
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    )
+                                    .clip(RoundedCornerShape(9999.dp))
+                                    .background(if (isSelected) ClayAccentLime else ClaySurface)
                                     .border(
                                         1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        RoundedCornerShape(10.dp)
+                                        if (isSelected) ClayInkDeep.copy(alpha = 0.3f) else ClayBorderHairline,
+                                        RoundedCornerShape(9999.dp)
                                     )
                                     .clickable { selectedCategoryId = cat.id }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
                                     .testTag("category_chip_${cat.id}"),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = CategoryIconHelper.getIcon(cat.iconKey),
                                     contentDescription = cat.name,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else catColor,
+                                    tint = if (isSelected) ClayInkDeep else catColor,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = cat.name,
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = ClayInkDeep
                                 )
                             }
                         }
@@ -330,8 +348,9 @@ fun AddTransactionScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ClaySurface)
+                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                     .clickable { showDatePicker() }
                     .padding(horizontal = 14.dp, vertical = 12.dp)
                     .testTag("date_picker_row"),
@@ -342,36 +361,91 @@ fun AddTransactionScreen(
                     Icon(
                         imageVector = Icons.Default.CalendarToday,
                         contentDescription = "Calendar icon",
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = ClayTextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = dateFormatter.format(Date(selectedDateEpochMs)),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = ClayTextPrimary
                     )
                 }
 
                 Text(
                     text = "Change",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ClayTextSecondary
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Optional Receipt Photo Attachment
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ClaySurface)
+                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
+                    .clickable {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .testTag("attach_receipt_button"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AddPhotoAlternate,
+                        contentDescription = "Attach receipt",
+                        tint = ClayTextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (receiptFilePath != null) "Receipt Attached" else "Attach Receipt Photo (Local)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ClayTextPrimary
+                    )
+                }
+
+                if (receiptFilePath != null) {
+                    IconButton(
+                        onClick = {
+                            receiptFilePath = null
+                            selectedImageUri = null
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove receipt", tint = SemanticExpense, modifier = Modifier.size(16.dp))
+                    }
+                } else {
+                    Text(
+                        text = "+ Photo",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ClayTextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Note Text Field
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("Note (optional, e.g. Lunch with team)") },
+                label = { Text("Note (optional)") },
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    focusedBorderColor = ClayInkDeep,
+                    unfocusedBorderColor = ClayBorderHairline,
+                    focusedContainerColor = ClaySurface,
+                    unfocusedContainerColor = ClaySurface
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -386,7 +460,6 @@ fun AddTransactionScreen(
                     if (keypadBuffer == "0") {
                         keypadBuffer = digit.toString()
                     } else {
-                        // Check decimal limit: reject if already has '.' and 2 decimal places
                         if (keypadBuffer.contains('.')) {
                             val decimals = keypadBuffer.substringAfter('.')
                             if (decimals.length < 2) {
@@ -413,7 +486,7 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Save Button
+            // Save Button (Clay High-Emphasis Primary Button)
             Button(
                 onClick = {
                     if (!isValid) return@Button
@@ -426,7 +499,8 @@ fun AddTransactionScreen(
                                 selectedFromAccountId!!,
                                 selectedCategoryId!!,
                                 note,
-                                selectedDateEpochMs
+                                selectedDateEpochMs,
+                                receiptFilePath
                             )
                         }
                         TransactionType.INCOME -> {
@@ -435,7 +509,8 @@ fun AddTransactionScreen(
                                 selectedToAccountId!!,
                                 selectedCategoryId!!,
                                 note,
-                                selectedDateEpochMs
+                                selectedDateEpochMs,
+                                receiptFilePath
                             )
                         }
                         TransactionType.TRANSFER -> {
@@ -452,10 +527,10 @@ fun AddTransactionScreen(
                 },
                 enabled = isValid,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContentColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+                    containerColor = ClayInkDeep,
+                    contentColor = Color.White,
+                    disabledContainerColor = ClaySurface,
+                    disabledContentColor = ClayTextSecondary.copy(alpha = 0.5f)
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
@@ -489,7 +564,7 @@ private fun AccountChipGroup(
         Text(
             text = title,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary,
+            color = ClayTextSecondary,
             modifier = Modifier.padding(bottom = 6.dp)
         )
 
@@ -503,22 +578,19 @@ private fun AccountChipGroup(
                 val isSelected = selectedAccountId == account.id
                 val accountColor = runCatching {
                     Color(android.graphics.Color.parseColor(account.colorHex))
-                }.getOrDefault(MaterialTheme.colorScheme.primary)
+                }.getOrDefault(ClayInkDeep)
 
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
+                        .clip(RoundedCornerShape(9999.dp))
+                        .background(if (isSelected) ClayAccentLime else ClaySurface)
                         .border(
                             1.dp,
-                            if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            RoundedCornerShape(10.dp)
+                            if (isSelected) ClayInkDeep.copy(alpha = 0.3f) else ClayBorderHairline,
+                            RoundedCornerShape(9999.dp)
                         )
                         .clickable { onAccountSelected(account.id) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                         .testTag("account_chip_${account.id}"),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -532,7 +604,7 @@ private fun AccountChipGroup(
                     Text(
                         text = account.name,
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = ClayInkDeep
                     )
                 }
             }

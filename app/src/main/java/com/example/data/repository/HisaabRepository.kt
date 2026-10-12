@@ -1,20 +1,31 @@
 package com.example.data.repository
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import com.example.data.database.HisaabDao
 import com.example.data.database.HisaabDatabase
 import com.example.data.model.AccountEntity
 import com.example.data.model.AccountType
 import com.example.data.model.AccountWithBalance
+import com.example.data.model.BudgetProgressItem
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
 import com.example.data.model.MonthlySummary
 import com.example.data.model.NeedEntity
+import com.example.data.model.OccurrenceStatus
+import com.example.data.model.PendingRecurringItem
+import com.example.data.model.ReceiptAttachmentEntity
+import com.example.data.model.RecurringFrequency
+import com.example.data.model.RecurringOccurrenceEntity
+import com.example.data.model.RecurringRuleEntity
 import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -22,6 +33,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Calendar
 
 class HisaabRepository(
@@ -31,9 +43,20 @@ class HisaabRepository(
 
     private val prefs = context.getSharedPreferences("hisaab_prefs", Context.MODE_PRIVATE)
 
+    private val _privacyMode = MutableStateFlow(prefs.getBoolean("privacy_mode", false))
+    val privacyMode: Flow<Boolean> = _privacyMode
+
+    fun setPrivacyMode(enabled: Boolean) {
+        prefs.edit().putBoolean("privacy_mode", enabled).apply()
+        _privacyMode.value = enabled
+    }
+
     suspend fun seedInitialDataIfNeeded() = withContext(Dispatchers.IO) {
         val alreadySeeded = prefs.getBoolean("hisaab_seeded_v1", false)
-        if (alreadySeeded) return@withContext
+        if (alreadySeeded) {
+            checkAndGenerateRecurringOccurrences()
+            return@withContext
+        }
 
         if (dao.getAccountsCount() == 0) {
             val defaultAccounts = listOf(
@@ -61,7 +84,6 @@ class HisaabRepository(
 
         if (dao.getCategoriesCount() == 0) {
             val defaultCategories = listOf(
-                // Expense categories
                 CategoryEntity(name = "Food & Dining", type = CategoryType.EXPENSE, iconKey = "restaurant", colorHex = "#E07A5F"),
                 CategoryEntity(name = "Groceries", type = CategoryType.EXPENSE, iconKey = "shopping_cart", colorHex = "#81B29A"),
                 CategoryEntity(name = "Fuel & Transport", type = CategoryType.EXPENSE, iconKey = "directions_car", colorHex = "#F2CC8F"),
@@ -71,7 +93,6 @@ class HisaabRepository(
                 CategoryEntity(name = "Shopping", type = CategoryType.EXPENSE, iconKey = "shopping_bag", colorHex = "#F4A261"),
                 CategoryEntity(name = "Education", type = CategoryType.EXPENSE, iconKey = "school", colorHex = "#2A9D8F"),
                 CategoryEntity(name = "Other Expense", type = CategoryType.EXPENSE, iconKey = "more_horiz", colorHex = "#8A8F99"),
-                // Income categories
                 CategoryEntity(name = "Salary", type = CategoryType.INCOME, iconKey = "payments", colorHex = "#6BA88A"),
                 CategoryEntity(name = "Freelance", type = CategoryType.INCOME, iconKey = "laptop", colorHex = "#457B9D"),
                 CategoryEntity(name = "Gift", type = CategoryType.INCOME, iconKey = "redeem", colorHex = "#E9C46A"),
@@ -81,8 +102,8 @@ class HisaabRepository(
             dao.insertCategories(defaultCategories)
         }
 
-        // Never seed transactions or fake balances!
         prefs.edit().putBoolean("hisaab_seeded_v1", true).apply()
+        checkAndGenerateRecurringOccurrences()
     }
 
     val totalBalancePaisa: Flow<Long> = dao.getTotalBalanceFlow().map { it ?: 0L }
@@ -132,7 +153,6 @@ class HisaabRepository(
     }.flowOn(Dispatchers.IO)
 
     val monthlySummary: Flow<MonthlySummary> = run {
-        // Last 30 days window
         val now = System.currentTimeMillis()
         val calendar = Calendar.getInstance().apply {
             timeInMillis = now
@@ -158,6 +178,202 @@ class HisaabRepository(
     val activeNeeds: Flow<List<NeedEntity>> = dao.getActiveNeedsFlow()
     val doneNeeds: Flow<List<NeedEntity>> = dao.getDoneNeedsFlow()
 
+    // --- Budgets ---
+    val budgetProgressList: Flow<List<BudgetProgressItem>> = run {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startOfMonth = cal.timeInMillis
+        val now = System.currentTimeMillis()
+
+        combine(
+            dao.getCategoriesByTypeFlow(CategoryType.EXPENSE),
+            dao.getCategorySpendingFlow(startOfMonth, now)
+        ) { categories, spendings ->
+            val spentMap = spendings.associate { it.categoryId to it.spentPaisa }
+            categories.filter { it.monthlyLimitPaisa != null && it.monthlyLimitPaisa > 0L }.map { cat ->
+                val spent = spentMap[cat.id] ?: 0L
+                BudgetProgressItem(
+                    category = cat,
+                    spentPaisa = spent,
+                    limitPaisa = cat.monthlyLimitPaisa ?: 0L
+                )
+            }
+        }.flowOn(Dispatchers.IO)
+    }
+
+    // --- Recurring Rules & Occurrences ---
+    val recurringRules: Flow<List<RecurringRuleEntity>> = dao.getAllRecurringRulesFlow()
+
+    val pendingRecurringItems: Flow<List<PendingRecurringItem>> = combine(
+        dao.getPendingOccurrencesFlow(),
+        dao.getAllRecurringRulesFlow(),
+        dao.getAllCategoriesFlow(),
+        dao.getAllAccountsFlow()
+    ) { occurrences, rules, categories, accounts ->
+        val ruleMap = rules.associateBy { it.id }
+        val catMap = categories.associateBy { it.id }
+        val accMap = accounts.associateBy { it.id }
+
+        occurrences.mapNotNull { occ ->
+            val rule = ruleMap[occ.ruleId] ?: return@mapNotNull null
+            val cat = catMap[rule.categoryId]
+            val acc = accMap[rule.accountId]
+            PendingRecurringItem(
+                occurrence = occ,
+                rule = rule,
+                categoryName = cat?.name,
+                categoryIconKey = cat?.iconKey,
+                accountName = acc?.name
+            )
+        }
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun checkAndGenerateRecurringOccurrences() = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val activeRules = dao.getActiveRecurringRules()
+        for (rule in activeRules) {
+            if (rule.nextDueEpochMs <= now) {
+                val existing = dao.getOccurrenceByRuleAndDate(rule.id, rule.nextDueEpochMs)
+                if (existing == null) {
+                    val occ = RecurringOccurrenceEntity(
+                        ruleId = rule.id,
+                        occurrenceDateEpochMs = rule.nextDueEpochMs,
+                        status = OccurrenceStatus.PENDING
+                    )
+                    dao.insertOccurrence(occ)
+                }
+            }
+        }
+    }
+
+    suspend fun confirmRecurringPayment(occurrenceId: Long): Long = withContext(Dispatchers.IO) {
+        val occurrences = HisaabDatabase.getInstance(context).query(
+            "SELECT * FROM recurring_occurrences WHERE id = ?",
+            arrayOf(occurrenceId)
+        )
+        var ruleId: Long? = null
+        var occDate: Long = System.currentTimeMillis()
+        occurrences.use { c ->
+            if (c.moveToNext()) {
+                ruleId = c.getLong(c.getColumnIndexOrThrow("ruleId"))
+                occDate = c.getLong(c.getColumnIndexOrThrow("occurrenceDateEpochMs"))
+            }
+        }
+        val targetRuleId = ruleId ?: throw IllegalArgumentException("Occurrence not found")
+        val rule = dao.getRecurringRuleById(targetRuleId) ?: throw IllegalArgumentException("Rule not found")
+
+        val txId = if (rule.type == TransactionType.EXPENSE) {
+            recordExpense(
+                amountPaisa = rule.amountPaisa,
+                fromAccountId = rule.accountId,
+                categoryId = rule.categoryId,
+                note = rule.title + (if (rule.note.isNotBlank()) " · ${rule.note}" else ""),
+                dateEpochMs = occDate,
+                recurringOccurrenceId = occurrenceId
+            )
+        } else {
+            recordIncome(
+                amountPaisa = rule.amountPaisa,
+                toAccountId = rule.accountId,
+                categoryId = rule.categoryId,
+                note = rule.title + (if (rule.note.isNotBlank()) " · ${rule.note}" else ""),
+                dateEpochMs = occDate,
+                recurringOccurrenceId = occurrenceId
+            )
+        }
+
+        val updatedOcc = RecurringOccurrenceEntity(
+            id = occurrenceId,
+            ruleId = rule.id,
+            occurrenceDateEpochMs = occDate,
+            status = OccurrenceStatus.CONFIRMED,
+            transactionId = txId
+        )
+        dao.updateOccurrence(updatedOcc)
+
+        val nextDue = calculateNextDue(rule.nextDueEpochMs, rule.frequency)
+        dao.updateRecurringRule(rule.copy(nextDueEpochMs = nextDue))
+
+        txId
+    }
+
+    suspend fun skipRecurringPayment(occurrenceId: Long) = withContext(Dispatchers.IO) {
+        val occurrences = HisaabDatabase.getInstance(context).query(
+            "SELECT * FROM recurring_occurrences WHERE id = ?",
+            arrayOf(occurrenceId)
+        )
+        var ruleId: Long? = null
+        var occDate: Long = System.currentTimeMillis()
+        occurrences.use { c ->
+            if (c.moveToNext()) {
+                ruleId = c.getLong(c.getColumnIndexOrThrow("ruleId"))
+                occDate = c.getLong(c.getColumnIndexOrThrow("occurrenceDateEpochMs"))
+            }
+        }
+        val targetRuleId = ruleId ?: return@withContext
+        val rule = dao.getRecurringRuleById(targetRuleId) ?: return@withContext
+
+        dao.updateOccurrence(
+            RecurringOccurrenceEntity(
+                id = occurrenceId,
+                ruleId = rule.id,
+                occurrenceDateEpochMs = occDate,
+                status = OccurrenceStatus.SKIPPED
+            )
+        )
+
+        val nextDue = calculateNextDue(rule.nextDueEpochMs, rule.frequency)
+        dao.updateRecurringRule(rule.copy(nextDueEpochMs = nextDue))
+    }
+
+    private fun calculateNextDue(currentEpochMs: Long, frequency: RecurringFrequency): Long {
+        val cal = Calendar.getInstance().apply { timeInMillis = currentEpochMs }
+        when (frequency) {
+            RecurringFrequency.DAILY -> cal.add(Calendar.DAY_OF_YEAR, 1)
+            RecurringFrequency.WEEKLY -> cal.add(Calendar.WEEK_OF_YEAR, 1)
+            RecurringFrequency.MONTHLY -> cal.add(Calendar.MONTH, 1)
+            RecurringFrequency.YEARLY -> cal.add(Calendar.YEAR, 1)
+        }
+        return cal.timeInMillis
+    }
+
+    suspend fun addRecurringRule(
+        title: String,
+        type: TransactionType,
+        amountPaisa: Long,
+        accountId: Long,
+        categoryId: Long,
+        frequency: RecurringFrequency,
+        startDateEpochMs: Long,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        require(title.isNotBlank()) { "Title cannot be blank" }
+        require(amountPaisa > 0) { "Amount must be positive" }
+        val rule = RecurringRuleEntity(
+            title = title.trim(),
+            type = type,
+            amountPaisa = amountPaisa,
+            accountId = accountId,
+            categoryId = categoryId,
+            frequency = frequency,
+            startDateEpochMs = startDateEpochMs,
+            nextDueEpochMs = startDateEpochMs,
+            note = note.trim()
+        )
+        val id = dao.insertRecurringRule(rule)
+        checkAndGenerateRecurringOccurrences()
+        id
+    }
+
+    suspend fun deleteRecurringRule(rule: RecurringRuleEntity) = withContext(Dispatchers.IO) {
+        dao.deleteRecurringRule(rule)
+    }
+
     // --- Actions ---
 
     suspend fun recordExpense(
@@ -165,7 +381,9 @@ class HisaabRepository(
         fromAccountId: Long,
         categoryId: Long,
         note: String,
-        dateEpochMs: Long
+        dateEpochMs: Long,
+        receiptPath: String? = null,
+        recurringOccurrenceId: Long? = null
     ): Long = withContext(Dispatchers.IO) {
         require(amountPaisa > 0) { "Amount must be greater than zero" }
         val tx = TransactionEntity(
@@ -175,9 +393,20 @@ class HisaabRepository(
             toAccountId = null,
             categoryId = categoryId,
             note = note.trim(),
+            receiptPath = receiptPath,
+            recurringOccurrenceId = recurringOccurrenceId,
             dateEpochMs = dateEpochMs
         )
-        dao.insertTransaction(tx)
+        val txId = dao.insertTransaction(tx)
+        if (receiptPath != null) {
+            dao.insertReceipt(
+                ReceiptAttachmentEntity(
+                    transactionId = txId,
+                    localRelativePath = receiptPath
+                )
+            )
+        }
+        txId
     }
 
     suspend fun recordIncome(
@@ -185,7 +414,9 @@ class HisaabRepository(
         toAccountId: Long,
         categoryId: Long,
         note: String,
-        dateEpochMs: Long
+        dateEpochMs: Long,
+        receiptPath: String? = null,
+        recurringOccurrenceId: Long? = null
     ): Long = withContext(Dispatchers.IO) {
         require(amountPaisa > 0) { "Amount must be greater than zero" }
         val tx = TransactionEntity(
@@ -195,9 +426,20 @@ class HisaabRepository(
             toAccountId = toAccountId,
             categoryId = categoryId,
             note = note.trim(),
+            receiptPath = receiptPath,
+            recurringOccurrenceId = recurringOccurrenceId,
             dateEpochMs = dateEpochMs
         )
-        dao.insertTransaction(tx)
+        val txId = dao.insertTransaction(tx)
+        if (receiptPath != null) {
+            dao.insertReceipt(
+                ReceiptAttachmentEntity(
+                    transactionId = txId,
+                    localRelativePath = receiptPath
+                )
+            )
+        }
+        txId
     }
 
     suspend fun recordTransfer(
@@ -231,10 +473,30 @@ class HisaabRepository(
         dao.insertTransaction(tx)
     }
 
+    // Receipt image save helper
+    suspend fun saveReceiptImage(uri: Uri): String? = withContext(Dispatchers.IO) {
+        try {
+            val receiptsDir = File(context.filesDir, "receipts").apply { mkdirs() }
+            val fileName = "receipt_${System.currentTimeMillis()}.jpg"
+            val targetFile = File(receiptsDir, fileName)
+
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val bitmap = BitmapFactory.decodeStream(input)
+                FileOutputStream(targetFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                }
+            }
+            targetFile.absolutePath
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun addNeed(
         name: String,
         expectedPricePaisa: Long?,
         whereToGet: String,
+        externalUrl: String,
         note: String
     ): Long = withContext(Dispatchers.IO) {
         require(name.isNotBlank()) { "Need name cannot be blank" }
@@ -242,6 +504,7 @@ class HisaabRepository(
             name = name.trim(),
             expectedPricePaisa = expectedPricePaisa,
             whereToGet = whereToGet.trim(),
+            externalUrl = externalUrl.trim(),
             note = note.trim()
         )
         dao.insertNeed(need)
@@ -320,126 +583,183 @@ class HisaabRepository(
         dao.deleteCategory(category)
     }
 
-    /**
-     * Exports full account, category, transaction, and needs data as validated JSON.
-     * Writes to app files directory and returns the absolute file path.
-     */
     suspend fun exportDataAsJsonFile(): File = withContext(Dispatchers.IO) {
         val root = JSONObject()
-        root.put("app", "Hisaab")
-        root.put("version", "1.0")
+        root.put("app", "Hisaab Do Bhai")
+        root.put("version", "2.0")
         root.put("exportedAtEpochMs", System.currentTimeMillis())
 
-        val accountsArray = JSONArray()
-        // Wait for first list
-        dao.getAllAccountsFlow()
-        val accounts = dao.getAccountsCount()
-        // We can query database directly
         val db = HisaabDatabase.getInstance(context)
-        val allAccountsList = withContext(Dispatchers.IO) {
-            val cursor = db.query("SELECT * FROM accounts", null)
-            val list = mutableListOf<JSONObject>()
-            cursor.use { c ->
-                while (c.moveToNext()) {
-                    val obj = JSONObject().apply {
-                        put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                        put("name", c.getString(c.getColumnIndexOrThrow("name")))
-                        put("type", c.getString(c.getColumnIndexOrThrow("type")))
-                        put("openingBalancePaisa", c.getLong(c.getColumnIndexOrThrow("openingBalancePaisa")))
-                        put("colorHex", c.getString(c.getColumnIndexOrThrow("colorHex")))
-                        put("isArchived", c.getInt(c.getColumnIndexOrThrow("isArchived")) == 1)
-                        put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                    }
-                    list.add(obj)
+
+        // Accounts
+        val accountsArray = JSONArray()
+        db.query("SELECT * FROM accounts", null).use { c ->
+            while (c.moveToNext()) {
+                val obj = JSONObject().apply {
+                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
+                    put("name", c.getString(c.getColumnIndexOrThrow("name")))
+                    put("type", c.getString(c.getColumnIndexOrThrow("type")))
+                    put("openingBalancePaisa", c.getLong(c.getColumnIndexOrThrow("openingBalancePaisa")))
+                    put("colorHex", c.getString(c.getColumnIndexOrThrow("colorHex")))
+                    put("isArchived", c.getInt(c.getColumnIndexOrThrow("isArchived")) == 1)
+                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
                 }
+                accountsArray.put(obj)
             }
-            list
         }
-        allAccountsList.forEach { accountsArray.put(it) }
         root.put("accounts", accountsArray)
 
+        // Categories
         val categoriesArray = JSONArray()
-        val allCategoriesList = withContext(Dispatchers.IO) {
-            val cursor = db.query("SELECT * FROM categories", null)
-            val list = mutableListOf<JSONObject>()
-            cursor.use { c ->
-                while (c.moveToNext()) {
-                    val obj = JSONObject().apply {
-                        put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                        put("name", c.getString(c.getColumnIndexOrThrow("name")))
-                        put("type", c.getString(c.getColumnIndexOrThrow("type")))
-                        put("iconKey", c.getString(c.getColumnIndexOrThrow("iconKey")))
-                        put("colorHex", c.getString(c.getColumnIndexOrThrow("colorHex")))
-                        val limitIdx = c.getColumnIndexOrThrow("monthlyLimitPaisa")
-                        if (!c.isNull(limitIdx)) {
-                            put("monthlyLimitPaisa", c.getLong(limitIdx))
-                        }
-                        put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                    }
-                    list.add(obj)
+        db.query("SELECT * FROM categories", null).use { c ->
+            while (c.moveToNext()) {
+                val obj = JSONObject().apply {
+                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
+                    put("name", c.getString(c.getColumnIndexOrThrow("name")))
+                    put("type", c.getString(c.getColumnIndexOrThrow("type")))
+                    put("iconKey", c.getString(c.getColumnIndexOrThrow("iconKey")))
+                    put("colorHex", c.getString(c.getColumnIndexOrThrow("colorHex")))
+                    val limitIdx = c.getColumnIndexOrThrow("monthlyLimitPaisa")
+                    if (!c.isNull(limitIdx)) put("monthlyLimitPaisa", c.getLong(limitIdx))
+                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
                 }
+                categoriesArray.put(obj)
             }
-            list
         }
-        allCategoriesList.forEach { categoriesArray.put(it) }
         root.put("categories", categoriesArray)
 
+        // Transactions
         val txArray = JSONArray()
-        val allTxList = withContext(Dispatchers.IO) {
-            val cursor = db.query("SELECT * FROM transactions", null)
-            val list = mutableListOf<JSONObject>()
-            cursor.use { c ->
-                while (c.moveToNext()) {
-                    val obj = JSONObject().apply {
-                        put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                        put("type", c.getString(c.getColumnIndexOrThrow("type")))
-                        put("amountPaisa", c.getLong(c.getColumnIndexOrThrow("amountPaisa")))
-                        val fromIdx = c.getColumnIndexOrThrow("fromAccountId")
-                        if (!c.isNull(fromIdx)) put("fromAccountId", c.getLong(fromIdx))
-                        val toIdx = c.getColumnIndexOrThrow("toAccountId")
-                        if (!c.isNull(toIdx)) put("toAccountId", c.getLong(toIdx))
-                        val catIdx = c.getColumnIndexOrThrow("categoryId")
-                        if (!c.isNull(catIdx)) put("categoryId", c.getLong(catIdx))
-                        put("note", c.getString(c.getColumnIndexOrThrow("note")))
-                        put("dateEpochMs", c.getLong(c.getColumnIndexOrThrow("dateEpochMs")))
-                        put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                    }
-                    list.add(obj)
+        db.query("SELECT * FROM transactions", null).use { c ->
+            while (c.moveToNext()) {
+                val obj = JSONObject().apply {
+                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
+                    put("type", c.getString(c.getColumnIndexOrThrow("type")))
+                    put("amountPaisa", c.getLong(c.getColumnIndexOrThrow("amountPaisa")))
+                    val fromIdx = c.getColumnIndexOrThrow("fromAccountId")
+                    if (!c.isNull(fromIdx)) put("fromAccountId", c.getLong(fromIdx))
+                    val toIdx = c.getColumnIndexOrThrow("toAccountId")
+                    if (!c.isNull(toIdx)) put("toAccountId", c.getLong(toIdx))
+                    val catIdx = c.getColumnIndexOrThrow("categoryId")
+                    if (!c.isNull(catIdx)) put("categoryId", c.getLong(catIdx))
+                    put("note", c.getString(c.getColumnIndexOrThrow("note")))
+                    put("dateEpochMs", c.getLong(c.getColumnIndexOrThrow("dateEpochMs")))
+                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
                 }
+                txArray.put(obj)
             }
-            list
         }
-        allTxList.forEach { txArray.put(it) }
         root.put("transactions", txArray)
 
+        // Needs
         val needsArray = JSONArray()
-        val allNeedsList = withContext(Dispatchers.IO) {
-            val cursor = db.query("SELECT * FROM needs", null)
-            val list = mutableListOf<JSONObject>()
-            cursor.use { c ->
-                while (c.moveToNext()) {
-                    val obj = JSONObject().apply {
-                        put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                        put("name", c.getString(c.getColumnIndexOrThrow("name")))
-                        val priceIdx = c.getColumnIndexOrThrow("expectedPricePaisa")
-                        if (!c.isNull(priceIdx)) put("expectedPricePaisa", c.getLong(priceIdx))
-                        put("whereToGet", c.getString(c.getColumnIndexOrThrow("whereToGet")))
-                        put("note", c.getString(c.getColumnIndexOrThrow("note")))
-                        put("isDone", c.getInt(c.getColumnIndexOrThrow("isDone")) == 1)
-                        put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                    }
-                    list.add(obj)
+        db.query("SELECT * FROM needs", null).use { c ->
+            while (c.moveToNext()) {
+                val obj = JSONObject().apply {
+                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
+                    put("name", c.getString(c.getColumnIndexOrThrow("name")))
+                    val priceIdx = c.getColumnIndexOrThrow("expectedPricePaisa")
+                    if (!c.isNull(priceIdx)) put("expectedPricePaisa", c.getLong(priceIdx))
+                    put("whereToGet", c.getString(c.getColumnIndexOrThrow("whereToGet")))
+                    put("externalUrl", c.getString(c.getColumnIndexOrThrow("externalUrl")))
+                    put("note", c.getString(c.getColumnIndexOrThrow("note")))
+                    put("isDone", c.getInt(c.getColumnIndexOrThrow("isDone")) == 1)
+                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
                 }
+                needsArray.put(obj)
             }
-            list
         }
-        allNeedsList.forEach { needsArray.put(it) }
         root.put("needs", needsArray)
 
         val exportDir = File(context.filesDir, "exports").apply { mkdirs() }
         val exportFile = File(exportDir, "hisaab_backup_${System.currentTimeMillis()}.json")
         exportFile.writeText(root.toString(2))
         exportFile
+    }
+
+    suspend fun restoreDataFromJson(jsonString: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val root = JSONObject(jsonString)
+            if (!root.has("accounts") || !root.has("categories")) {
+                return@withContext Result.failure(IllegalArgumentException("Invalid Hisaab backup: missing accounts or categories"))
+            }
+
+            val accountsArray = root.getJSONArray("accounts")
+            val categoriesArray = root.getJSONArray("categories")
+            val txArray = root.optJSONArray("transactions") ?: JSONArray()
+            val needsArray = root.optJSONArray("needs") ?: JSONArray()
+
+            // Restore Accounts
+            val accounts = mutableListOf<AccountEntity>()
+            for (i in 0 until accountsArray.length()) {
+                val obj = accountsArray.getJSONObject(i)
+                accounts.add(
+                    AccountEntity(
+                        id = obj.optLong("id", 0),
+                        name = obj.getString("name"),
+                        type = AccountType.valueOf(obj.getString("type")),
+                        openingBalancePaisa = obj.optLong("openingBalancePaisa", 0L),
+                        colorHex = obj.optString("colorHex", "#7C9A6B"),
+                        isArchived = obj.optBoolean("isArchived", false)
+                    )
+                )
+            }
+            dao.insertAccounts(accounts)
+
+            // Restore Categories
+            val categories = mutableListOf<CategoryEntity>()
+            for (i in 0 until categoriesArray.length()) {
+                val obj = categoriesArray.getJSONObject(i)
+                categories.add(
+                    CategoryEntity(
+                        id = obj.optLong("id", 0),
+                        name = obj.getString("name"),
+                        type = CategoryType.valueOf(obj.getString("type")),
+                        iconKey = obj.optString("iconKey", "category"),
+                        colorHex = obj.optString("colorHex", "#8A8F99"),
+                        monthlyLimitPaisa = if (obj.has("monthlyLimitPaisa")) obj.getLong("monthlyLimitPaisa") else null
+                    )
+                )
+            }
+            dao.insertCategories(categories)
+
+            // Restore Transactions
+            for (i in 0 until txArray.length()) {
+                val obj = txArray.getJSONObject(i)
+                dao.insertTransaction(
+                    TransactionEntity(
+                        id = obj.optLong("id", 0),
+                        type = TransactionType.valueOf(obj.getString("type")),
+                        amountPaisa = obj.getLong("amountPaisa"),
+                        fromAccountId = if (obj.has("fromAccountId")) obj.getLong("fromAccountId") else null,
+                        toAccountId = if (obj.has("toAccountId")) obj.getLong("toAccountId") else null,
+                        categoryId = if (obj.has("categoryId")) obj.getLong("categoryId") else null,
+                        note = obj.optString("note", ""),
+                        dateEpochMs = obj.optLong("dateEpochMs", System.currentTimeMillis())
+                    )
+                )
+            }
+
+            // Restore Needs
+            for (i in 0 until needsArray.length()) {
+                val obj = needsArray.getJSONObject(i)
+                dao.insertNeed(
+                    NeedEntity(
+                        id = obj.optLong("id", 0),
+                        name = obj.getString("name"),
+                        expectedPricePaisa = if (obj.has("expectedPricePaisa")) obj.getLong("expectedPricePaisa") else null,
+                        whereToGet = obj.optString("whereToGet", ""),
+                        externalUrl = obj.optString("externalUrl", ""),
+                        note = obj.optString("note", ""),
+                        isDone = obj.optBoolean("isDone", false)
+                    )
+                )
+            }
+
+            Result.success("Restored ${accounts.size} accounts, ${categories.size} categories, ${txArray.length()} transactions, and ${needsArray.length()} needs.")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     companion object {

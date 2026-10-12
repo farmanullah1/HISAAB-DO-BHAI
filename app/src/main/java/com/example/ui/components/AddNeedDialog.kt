@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -27,12 +25,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.model.NeedEntity
 import com.example.domain.Money
+import com.example.ui.theme.ClayInkDeep
 
 @Composable
 fun AddNeedDialog(
     initialNeed: NeedEntity? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, pricePaisa: Long?, where: String, note: String) -> Unit
+    onSave: (name: String, pricePaisa: Long?, where: String, externalUrl: String, note: String) -> Unit
 ) {
     var name by remember { mutableStateOf(initialNeed?.name ?: "") }
     var priceText by remember {
@@ -41,6 +40,7 @@ fun AddNeedDialog(
         )
     }
     var whereToGet by remember { mutableStateOf(initialNeed?.whereToGet ?: "") }
+    var externalUrl by remember { mutableStateOf(initialNeed?.externalUrl ?: "") }
     var note by remember { mutableStateOf(initialNeed?.note ?: "") }
     var nameError by remember { mutableStateOf(false) }
 
@@ -90,11 +90,21 @@ fun AddNeedDialog(
                 OutlinedTextField(
                     value = whereToGet,
                     onValueChange = { whereToGet = it },
-                    label = { Text("Where to get (optional)") },
+                    label = { Text("Shop / Seller (optional)") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("need_where_input")
+                )
+
+                OutlinedTextField(
+                    value = externalUrl,
+                    onValueChange = { externalUrl = it },
+                    label = { Text("Online Link / URL (optional)") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("need_url_input")
                 )
 
                 OutlinedTextField(
@@ -116,13 +126,13 @@ fun AddNeedDialog(
                         return@Button
                     }
                     val parsedPrice = Money.parsePaisa(priceText)
-                    onSave(name.trim(), parsedPrice, whereToGet.trim(), note.trim())
+                    onSave(name.trim(), parsedPrice, whereToGet.trim(), externalUrl.trim(), note.trim())
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = ClayInkDeep,
+                    contentColor = androidx.compose.ui.graphics.Color.White
                 ),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.testTag("need_save_button")
             ) {
                 Text("Save")
@@ -136,6 +146,6 @@ fun AddNeedDialog(
                 Text("Cancel", color = MaterialTheme.colorScheme.secondary)
             }
         },
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     )
 }

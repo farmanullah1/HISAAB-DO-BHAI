@@ -6,48 +6,52 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AccentSage,
-    onPrimary = DarkGround,
-    secondary = DarkSecondaryInk,
-    onSecondary = DarkPrimaryInk,
-    tertiary = IncomeGreen,
-    onTertiary = DarkGround,
-    background = DarkGround,
-    onBackground = DarkPrimaryInk,
-    surface = DarkSurface,
-    onSurface = DarkPrimaryInk,
-    surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = DarkSecondaryInk,
-    outline = DarkHairline,
-    error = ExpenseTerracotta,
-    onError = DarkPrimaryInk
+// Clay Light Color Scheme (Primary / Default)
+private val ClayLightColorScheme = lightColorScheme(
+    primary = ClayAccentLimeDeep,
+    onPrimary = ClayInkDeep,
+    primaryContainer = ClayAccentLime,
+    onPrimaryContainer = ClayInkDeep,
+    secondary = ClayTextSecondary,
+    onSecondary = ClayTextPrimary,
+    tertiary = SemanticIncome,
+    background = ClayBackground,
+    onBackground = ClayTextPrimary,
+    surface = ClaySurfaceElevated,
+    onSurface = ClayTextPrimary,
+    surfaceVariant = ClaySurface,
+    onSurfaceVariant = ClayTextSecondary,
+    outline = ClayBorderHairline,
+    error = SemanticExpense,
+    onError = ClaySurfaceElevated
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = AccentSage,
-    onPrimary = LightSurface,
-    secondary = LightSecondaryInk,
-    onSecondary = LightPrimaryInk,
-    tertiary = IncomeGreen,
-    onTertiary = LightSurface,
-    background = LightGround,
-    onBackground = LightPrimaryInk,
-    surface = LightSurface,
-    onSurface = LightPrimaryInk,
-    surfaceVariant = LightSurfaceVariant,
-    onSurfaceVariant = LightSecondaryInk,
-    outline = LightHairline,
-    error = ExpenseTerracotta,
-    onError = LightSurface
+// Clay Dark Color Scheme
+private val ClayDarkColorScheme = darkColorScheme(
+    primary = ClayAccentLime,
+    onPrimary = ClayInkDeep,
+    primaryContainer = ClayAccentLimeDeep,
+    onPrimaryContainer = ClayInkDeep,
+    secondary = DarkClayTextSecondary,
+    onSecondary = DarkClayTextPrimary,
+    tertiary = SemanticIncome,
+    background = DarkClayBackground,
+    onBackground = DarkClayTextPrimary,
+    surface = DarkClaySurfaceElevated,
+    onSurface = DarkClayTextPrimary,
+    surfaceVariant = DarkClaySurface,
+    onSurfaceVariant = DarkClayTextSecondary,
+    outline = DarkClayBorderHairline,
+    error = SemanticExpense,
+    onError = DarkClayTextPrimary
 )
 
 @Composable
 fun HisaabTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Light is default for Clay design!
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = if (darkTheme) ClayDarkColorScheme else ClayLightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

@@ -25,35 +25,38 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.MonthlySummary
 import com.example.domain.Money
-import com.example.ui.theme.ExpenseTerracotta
-import com.example.ui.theme.IncomeGreen
+import com.example.ui.theme.ClayBorderHairline
+import com.example.ui.theme.ClayTextSecondary
+import com.example.ui.theme.SemanticExpense
+import com.example.ui.theme.SemanticIncome
 
 @Composable
 fun MonthlySummaryCard(
     summary: MonthlySummary,
+    privacyMode: Boolean,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(18.dp)
         ) {
             Text(
                 text = "PAST 30 DAYS ACTIVITY",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
+                color = ClayTextSecondary,
                 letterSpacing = 0.8.sp
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -67,24 +70,24 @@ fun MonthlySummaryCard(
                     Icon(
                         imageVector = Icons.Default.ArrowUpward,
                         contentDescription = "Income indicator",
-                        tint = IncomeGreen,
+                        tint = SemanticIncome,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Column {
                         Text(
                             text = "Income",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = ClayTextSecondary
                         )
                         Text(
-                            text = Money.formatPkr(summary.incomePaisa),
+                            text = if (privacyMode) "••••••" else Money.formatPkr(summary.incomePaisa),
                             style = MaterialTheme.typography.titleMedium,
-                            color = IncomeGreen
+                            color = SemanticIncome
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 // Expense column
                 Row(
@@ -94,19 +97,19 @@ fun MonthlySummaryCard(
                     Icon(
                         imageVector = Icons.Default.ArrowDownward,
                         contentDescription = "Expense indicator",
-                        tint = ExpenseTerracotta,
+                        tint = SemanticExpense,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Column {
                         Text(
                             text = "Expenses",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = ClayTextSecondary
                         )
                         Text(
-                            text = Money.formatPkr(summary.expensePaisa),
+                            text = if (privacyMode) "••••••" else Money.formatPkr(summary.expensePaisa),
                             style = MaterialTheme.typography.titleMedium,
-                            color = ExpenseTerracotta
+                            color = SemanticExpense
                         )
                     }
                 }

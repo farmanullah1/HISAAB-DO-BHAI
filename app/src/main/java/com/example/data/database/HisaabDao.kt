@@ -10,12 +10,21 @@ import com.example.data.model.AccountEntity
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
 import com.example.data.model.NeedEntity
+import com.example.data.model.OccurrenceStatus
+import com.example.data.model.ReceiptAttachmentEntity
+import com.example.data.model.RecurringOccurrenceEntity
+import com.example.data.model.RecurringRuleEntity
 import com.example.data.model.TransactionEntity
 import kotlinx.coroutines.flow.Flow
 
 data class AccountBalanceRecord(
     val accountId: Long,
     val balancePaisa: Long
+)
+
+data class CategorySpentRecord(
+    val categoryId: Long,
+    val spentPaisa: Long
 )
 
 @Dao
@@ -95,12 +104,18 @@ interface HisaabDao {
     @Delete
     suspend fun deleteCategory(category: CategoryEntity)
 
+    // Category Spending for Budgets
+    @Query("""
+        SELECT categoryId, COALESCE(SUM(amountPaisa), 0) AS spentPaisa
+        FROM transactions
+        WHERE type = 'EXPENSE' AND categoryId IS NOT NULL AND dateEpochMs >= :startEpochMs AND dateEpochMs <= :endEpochMs
+        GROUP BY categoryId
+    """)
+    fun getCategorySpendingFlow(startEpochMs: Long, endEpochMs: Long): Flow<List<CategorySpentRecord>>
+
     // --- Transactions ---
     @Query("SELECT * FROM transactions ORDER BY dateEpochMs DESC, id DESC")
     fun getAllTransactionsFlow(): Flow<List<TransactionEntity>>
-
-    @Query("SELECT * FROM transactions WHERE fromAccountId = :accountId OR toAccountId = :accountId ORDER BY dateEpochMs DESC, id DESC")
-    fun getTransactionsForAccountFlow(accountId: Long): Flow<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getTransactionById(id: Long): TransactionEntity?
@@ -128,7 +143,7 @@ interface HisaabDao {
     """)
     fun getPeriodExpenseFlow(startEpochMs: Long, endEpochMs: Long): Flow<Long?>
 
-    // --- Needs / Wishlist ---
+    // --- Needs / Shopping Planner ---
     @Query("SELECT * FROM needs WHERE isDone = 0 ORDER BY id DESC")
     fun getActiveNeedsFlow(): Flow<List<NeedEntity>>
 
@@ -150,6 +165,47 @@ interface HisaabDao {
     @Query("DELETE FROM needs WHERE isDone = 1")
     suspend fun clearAllDoneNeeds()
 
+    // --- Receipt Attachments ---
+    @Query("SELECT * FROM receipt_attachments WHERE transactionId = :transactionId LIMIT 1")
+    fun getReceiptForTransactionFlow(transactionId: Long): Flow<ReceiptAttachmentEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReceipt(attachment: ReceiptAttachmentEntity): Long
+
+    @Delete
+    suspend fun deleteReceipt(attachment: ReceiptAttachmentEntity)
+
+    // --- Recurring Rules & Occurrences ---
+    @Query("SELECT * FROM recurring_rules ORDER BY id DESC")
+    fun getAllRecurringRulesFlow(): Flow<List<RecurringRuleEntity>>
+
+    @Query("SELECT * FROM recurring_rules WHERE isActive = 1")
+    suspend fun getActiveRecurringRules(): List<RecurringRuleEntity>
+
+    @Query("SELECT * FROM recurring_rules WHERE id = :id")
+    suspend fun getRecurringRuleById(id: Long): RecurringRuleEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecurringRule(rule: RecurringRuleEntity): Long
+
+    @Update
+    suspend fun updateRecurringRule(rule: RecurringRuleEntity)
+
+    @Delete
+    suspend fun deleteRecurringRule(rule: RecurringRuleEntity)
+
+    @Query("SELECT * FROM recurring_occurrences WHERE status = 'PENDING' ORDER BY occurrenceDateEpochMs ASC")
+    fun getPendingOccurrencesFlow(): Flow<List<RecurringOccurrenceEntity>>
+
+    @Query("SELECT * FROM recurring_occurrences WHERE ruleId = :ruleId AND occurrenceDateEpochMs = :dateEpochMs LIMIT 1")
+    suspend fun getOccurrenceByRuleAndDate(ruleId: Long, dateEpochMs: Long): RecurringOccurrenceEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertOccurrence(occurrence: RecurringOccurrenceEntity): Long
+
+    @Update
+    suspend fun updateOccurrence(occurrence: RecurringOccurrenceEntity)
+
     // Counts for integrity check
     @Query("SELECT COUNT(*) FROM accounts")
     suspend fun getAccountsCount(): Int
@@ -162,4 +218,7 @@ interface HisaabDao {
 
     @Query("SELECT COUNT(*) FROM needs")
     suspend fun getNeedsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM recurring_rules")
+    suspend fun getRecurringRulesCount(): Int
 }

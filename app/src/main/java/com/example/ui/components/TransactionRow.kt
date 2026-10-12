@@ -2,13 +2,13 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +24,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,9 +38,14 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
 import com.example.domain.Money
-import com.example.ui.theme.AccentSage
-import com.example.ui.theme.ExpenseTerracotta
-import com.example.ui.theme.IncomeGreen
+import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayBorderHairline
+import com.example.ui.theme.ClayInkDeep
+import com.example.ui.theme.ClaySurface
+import com.example.ui.theme.ClayTextPrimary
+import com.example.ui.theme.ClayTextSecondary
+import com.example.ui.theme.SemanticExpense
+import com.example.ui.theme.SemanticIncome
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,27 +53,30 @@ import java.util.Locale
 @Composable
 fun TransactionRow(
     item: TransactionItem,
+    privacyMode: Boolean,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val tx = item.transaction
-    val dateFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
     val formattedDate = dateFormatter.format(Date(tx.dateEpochMs))
 
-    val (tintColor, amountColor, title) = when (tx.type) {
+    var showReceiptDialog by remember { mutableStateOf(false) }
+
+    val (tintBg, amountColor, title) = when (tx.type) {
         TransactionType.INCOME -> Triple(
-            IncomeGreen,
-            IncomeGreen,
+            SemanticIncome.copy(alpha = 0.12f),
+            SemanticIncome,
             item.categoryName ?: "Income"
         )
         TransactionType.EXPENSE -> Triple(
-            ExpenseTerracotta,
-            ExpenseTerracotta,
+            SemanticExpense.copy(alpha = 0.12f),
+            SemanticExpense,
             item.categoryName ?: "Expense"
         )
         TransactionType.TRANSFER -> Triple(
-            AccentSage,
-            MaterialTheme.colorScheme.onSurface,
+            ClayAccentLime.copy(alpha = 0.5f),
+            ClayTextPrimary,
             "Transfer"
         )
     }
@@ -78,7 +91,7 @@ fun TransactionRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp)),
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(14.dp)
     ) {
@@ -93,21 +106,21 @@ fun TransactionRow(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(tintColor.copy(alpha = 0.15f)),
+                    .background(tintBg),
                 contentAlignment = Alignment.Center
             ) {
                 if (tx.type == TransactionType.TRANSFER) {
                     Icon(
                         imageVector = Icons.Default.SwapHoriz,
                         contentDescription = "Transfer",
-                        tint = tintColor,
+                        tint = ClayInkDeep,
                         modifier = Modifier.size(24.dp)
                     )
                 } else {
                     Icon(
                         imageVector = CategoryIconHelper.getIcon(item.categoryIconKey),
                         contentDescription = title,
-                        tint = tintColor,
+                        tint = amountColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -119,18 +132,45 @@ fun TransactionRow(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ClayTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (tx.receiptPath != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(ClaySurface)
+                                .clickable { showReceiptDialog = true }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Receipt,
+                                    contentDescription = "View receipt",
+                                    tint = ClayTextSecondary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Receipt",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ClayTextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = ClayTextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -139,7 +179,7 @@ fun TransactionRow(
                     Text(
                         text = tx.note,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
+                        color = ClayTextSecondary.copy(alpha = 0.8f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -148,7 +188,7 @@ fun TransactionRow(
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                    color = ClayTextSecondary.copy(alpha = 0.6f)
                 )
             }
 
@@ -160,8 +200,8 @@ fun TransactionRow(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = Money.formatSigned(tx.amountPaisa, tx.type),
-                    style = MaterialTheme.typography.titleMedium,
+                    text = if (privacyMode) "••••••" else Money.formatSigned(tx.amountPaisa, tx.type),
+                    style = MaterialTheme.typography.titleLarge,
                     color = amountColor
                 )
 
@@ -174,11 +214,18 @@ fun TransactionRow(
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = "Delete transaction",
-                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                        tint = ClayTextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
+    }
+
+    if (showReceiptDialog && tx.receiptPath != null) {
+        ReceiptViewerDialog(
+            filePath = tx.receiptPath,
+            onDismiss = { showReceiptDialog = false }
+        )
     }
 }

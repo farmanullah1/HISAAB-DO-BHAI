@@ -10,6 +10,7 @@ data class NeedEntity(
     val name: String,
     val expectedPricePaisa: Long? = null,
     val whereToGet: String = "",
+    val externalUrl: String = "",
     val note: String = "",
     val isDone: Boolean = false,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
