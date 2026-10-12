@@ -47,10 +47,14 @@ fun AddAccountDialog(
     onSave: (name: String, type: AccountType, openingBalancePaisa: Long, colorHex: String) -> Unit
 ) {
     var name by remember { mutableStateOf(initialAccount?.name ?: "") }
-    var selectedType by remember { mutableStateOf(initialAccount?.type ?: AccountType.CASH) }
+    var selectedType by remember { mutableStateOf(initialAccount?.type ?: AccountType.CASH_WALLET) }
     var openingBalanceText by remember {
         mutableStateOf(
-            initialAccount?.let { (it.openingBalancePaisa / 100.0).toString() } ?: "0"
+            initialAccount?.let {
+                val rupees = it.openingBalancePaisa / 100
+                val paisa = it.openingBalancePaisa % 100
+                if (paisa == 0L) "$rupees" else "$rupees.${String.format(java.util.Locale.US, "%02d", paisa)}"
+            } ?: "0"
         )
     }
     val colorPalette = listOf(
@@ -100,10 +104,16 @@ fun AddAccountDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     AccountType.values().forEach { type ->
+                        val displayLabel = when (type) {
+                            AccountType.CASH_WALLET -> "Cash Wallet"
+                            AccountType.BANK -> "Bank"
+                            AccountType.SAVINGS -> "Savings"
+                            AccountType.OTHER -> "Other"
+                        }
                         FilterChip(
                             selected = selectedType == type,
                             onClick = { selectedType = type },
-                            label = { Text(type.name, style = MaterialTheme.typography.labelSmall) },
+                            label = { Text(displayLabel, style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary

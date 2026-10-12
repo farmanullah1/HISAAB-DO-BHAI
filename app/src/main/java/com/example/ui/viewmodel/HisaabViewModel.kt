@@ -15,6 +15,7 @@ import com.example.data.model.NeedEntity
 import com.example.data.model.PendingRecurringItem
 import com.example.data.model.RecurringFrequency
 import com.example.data.model.RecurringRuleEntity
+import com.example.data.model.ReservedAmountEntity
 import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType

@@ -47,16 +47,20 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.example.data.model.AccountEntity
 import com.example.data.model.AccountWithBalance
 import com.example.data.model.BudgetProgressItem
 import com.example.data.model.MonthlySummary
 import com.example.data.model.PendingRecurringItem
+import com.example.data.model.ReservedAmountEntity
 import com.example.data.model.TransactionItem
+import com.example.ui.components.AddAccountDialog
 import com.example.ui.components.BalanceCard
 import com.example.ui.components.BudgetSectionCard
 import com.example.ui.components.ClayEmptyState
 import com.example.ui.components.MonthlySummaryCard
 import com.example.ui.components.PendingRecurringCard
+import com.example.ui.components.ReservedMoneyDialog
 import com.example.ui.components.TransactionRow
 import com.example.ui.theme.ClayAccentLime
 import com.example.ui.theme.ClayBorderHairline
@@ -68,6 +72,9 @@ import com.example.ui.theme.ClayTextSecondary
 @Composable
 fun HomeScreen(
     totalBalancePaisa: Long,
+    remainingBalancePaisa: Long,
+    reservedPaisa: Long,
+    reservedAmounts: List<ReservedAmountEntity> = emptyList(),
     accounts: List<AccountWithBalance>,
     monthlySummary: MonthlySummary,
     transactions: List<TransactionItem>,
@@ -80,6 +87,10 @@ fun HomeScreen(
     onDeleteTransaction: (Long) -> Unit,
     onUndoDelete: () -> Unit,
     onNavigateToAdd: () -> Unit,
+    onUpdateAccount: (AccountEntity) -> Unit = {},
+    onAddReserve: (title: String, amountPaisa: Long, note: String) -> Unit = { _, _, _ -> },
+    onToggleReserveActive: (ReservedAmountEntity) -> Unit = {},
+    onDeleteReserve: (ReservedAmountEntity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,6 +98,8 @@ fun HomeScreen(
     var selectedAccountId by remember { mutableStateOf<Long?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var isSearchVisible by remember { mutableStateOf(false) }
+    var accountToEdit by remember { mutableStateOf<AccountEntity?>(null) }
+    var showManageReservesDialog by remember { mutableStateOf(false) }
 
     val filteredTransactions = remember(transactions, selectedAccountId, searchQuery) {
         transactions.filter { item ->
@@ -221,9 +234,13 @@ fun HomeScreen(
             item {
                 BalanceCard(
                     totalBalancePaisa = totalBalancePaisa,
+                    remainingBalancePaisa = remainingBalancePaisa,
+                    reservedPaisa = reservedPaisa,
                     accounts = accounts,
                     selectedAccountId = selectedAccountId,
                     onAccountSelected = { selectedAccountId = it },
+                    onEditAccount = { accountToEdit = it },
+                    onManageReserves = { showManageReservesDialog = true },
                     privacyMode = privacyMode,
                     onTogglePrivacy = onTogglePrivacy
                 )
@@ -308,5 +325,35 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(30.dp))
             }
         }
+    }
+
+    if (accountToEdit != null) {
+        AddAccountDialog(
+            initialAccount = accountToEdit,
+            onDismiss = { accountToEdit = null },
+            onSave = { name, type, openingBalance, colorHex ->
+                accountToEdit?.let { current ->
+                    onUpdateAccount(
+                        current.copy(
+                            name = name,
+                            type = type,
+                            openingBalancePaisa = openingBalance,
+                            colorHex = colorHex
+                        )
+                    )
+                }
+                accountToEdit = null
+            }
+        )
+    }
+
+    if (showManageReservesDialog) {
+        ReservedMoneyDialog(
+            reservedAmounts = reservedAmounts,
+            onAddReserve = onAddReserve,
+            onToggleActive = onToggleReserveActive,
+            onDelete = onDeleteReserve,
+            onDismiss = { showManageReservesDialog = false }
+        )
     }
 }

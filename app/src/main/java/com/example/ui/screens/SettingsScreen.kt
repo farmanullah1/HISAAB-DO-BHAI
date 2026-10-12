@@ -182,8 +182,14 @@ fun SettingsScreen(
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = ClayTextPrimary
                                         )
+                                        val typeLabel = when (item.account.type) {
+                                            AccountType.CASH_WALLET -> "Cash Wallet"
+                                            AccountType.BANK -> "Bank Account"
+                                            AccountType.SAVINGS -> "Savings"
+                                            AccountType.OTHER -> "Other"
+                                        }
                                         Text(
-                                            text = item.account.type.name,
+                                            text = typeLabel,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = ClayTextSecondary
                                         )

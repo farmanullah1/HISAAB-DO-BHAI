@@ -44,6 +44,9 @@ fun HisaabApp(
     val currentRoute = navBackStackEntry?.destination?.route
 
     val totalBalancePaisa by viewModel.totalBalancePaisa.collectAsStateWithLifecycle()
+    val remainingBalancePaisa by viewModel.remainingBalancePaisa.collectAsStateWithLifecycle()
+    val activeReservedTotalPaisa by viewModel.activeReservedTotalPaisa.collectAsStateWithLifecycle()
+    val reservedAmounts by viewModel.reservedAmounts.collectAsStateWithLifecycle()
     val accountsWithBalances by viewModel.accountsWithBalances.collectAsStateWithLifecycle()
     val activeAccounts by viewModel.activeAccounts.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
@@ -118,6 +121,9 @@ fun HisaabApp(
             composable(NavScreen.Home.route) {
                 HomeScreen(
                     totalBalancePaisa = totalBalancePaisa,
+                    remainingBalancePaisa = remainingBalancePaisa,
+                    reservedPaisa = activeReservedTotalPaisa,
+                    reservedAmounts = reservedAmounts,
                     accounts = accountsWithBalances,
                     monthlySummary = monthlySummary,
                     transactions = transactions,
@@ -133,7 +139,13 @@ fun HisaabApp(
                         navController.navigate(NavScreen.Add.route) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onUpdateAccount = { viewModel.updateAccount(it) },
+                    onAddReserve = { title, amount, note ->
+                        viewModel.addReservedAmount(title, amount, null, note)
+                    },
+                    onToggleReserveActive = { viewModel.toggleReservedAmountActive(it) },
+                    onDeleteReserve = { viewModel.deleteReservedAmount(it) }
                 )
             }
 
