@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import com.example.data.model.AccountEntity
 import com.example.data.model.AccountWithBalance
 import com.example.data.model.BudgetProgressItem
+import com.example.data.model.KarzSummary
 import com.example.data.model.MonthlySummary
 import com.example.data.model.PendingRecurringItem
 import com.example.data.model.ReservedAmountEntity
@@ -58,6 +59,7 @@ import com.example.ui.components.AddAccountDialog
 import com.example.ui.components.BalanceCard
 import com.example.ui.components.BudgetSectionCard
 import com.example.ui.components.ClayEmptyState
+import com.example.ui.components.KarzSummaryCard
 import com.example.ui.components.MonthlySummaryCard
 import com.example.ui.components.PendingRecurringCard
 import com.example.ui.components.ReservedMoneyDialog
@@ -81,6 +83,8 @@ fun HomeScreen(
     pendingRecurring: List<PendingRecurringItem>,
     budgets: List<BudgetProgressItem>,
     privacyMode: Boolean,
+    karzSummary: KarzSummary? = null,
+    onNavigateToKarz: () -> Unit = {},
     onTogglePrivacy: () -> Unit,
     onConfirmRecurring: (Long) -> Unit,
     onSkipRecurring: (Long) -> Unit,
@@ -252,6 +256,17 @@ fun HomeScreen(
                     summary = monthlySummary,
                     privacyMode = privacyMode
                 )
+            }
+
+            // Karz Summary Card (Debt & Loan Management)
+            if (karzSummary != null) {
+                item {
+                    KarzSummaryCard(
+                        summary = karzSummary,
+                        privacyMode = privacyMode,
+                        onViewAll = onNavigateToKarz
+                    )
+                }
             }
 
             // Budget Progress Section

@@ -133,7 +133,7 @@ fun AddTransactionScreen(
         derivedStateOf { Money.keypadBufferToPaisa(keypadBuffer) }
     }
 
-    val isValid by remember {
+    val isValid: Boolean by remember {
         derivedStateOf {
             if (amountPaisa <= 0L) return@derivedStateOf false
             when (selectedType) {
@@ -142,6 +142,7 @@ fun AddTransactionScreen(
                 TransactionType.TRANSFER -> selectedFromAccountId != null &&
                         selectedToAccountId != null &&
                         selectedFromAccountId != selectedToAccountId
+                else -> false
             }
         }
     }
@@ -189,12 +190,13 @@ fun AddTransactionScreen(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                TransactionType.values().forEach { type ->
+                listOf(TransactionType.EXPENSE, TransactionType.INCOME, TransactionType.TRANSFER).forEach { type ->
                     val isSelected = selectedType == type
                     val label = when (type) {
                         TransactionType.EXPENSE -> "Expense"
                         TransactionType.INCOME -> "Income"
                         TransactionType.TRANSFER -> "Transfer"
+                        else -> ""
                     }
 
                     Box(
@@ -243,6 +245,7 @@ fun AddTransactionScreen(
                     TransactionType.EXPENSE -> SemanticExpense
                     TransactionType.INCOME -> SemanticIncome
                     TransactionType.TRANSFER -> ClayTextPrimary
+                    else -> ClayTextPrimary
                 },
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("live_amount_display")
@@ -283,6 +286,7 @@ fun AddTransactionScreen(
                         onAccountSelected = { selectedToAccountId = it }
                     )
                 }
+                else -> {}
             }
 
             // Category Chips (hidden for Transfer)
@@ -522,6 +526,7 @@ fun AddTransactionScreen(
                                 selectedDateEpochMs
                             )
                         }
+                        else -> {}
                     }
                     onTransactionSaved()
                 },

@@ -12,6 +12,13 @@ import com.example.data.model.AccountWithBalance
 import com.example.data.model.BudgetProgressItem
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
+import com.example.data.model.DebtDirection
+import com.example.data.model.DebtEntity
+import com.example.data.model.DebtEventEntity
+import com.example.data.model.DebtEventType
+import com.example.data.model.DebtStatus
+import com.example.data.model.DebtWithDetails
+import com.example.data.model.KarzSummary
 import com.example.data.model.MonthlySummary
 import com.example.data.model.NeedEntity
 import com.example.data.model.OccurrenceStatus
@@ -28,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -268,6 +276,75 @@ class HisaabRepository(
                 accountName = acc?.name
             )
         }
+    }.flowOn(Dispatchers.IO)
+
+    // --- Karz (Debt & Loan Management) Flows ---
+    val allDebtsWithDetails: Flow<List<DebtWithDetails>> = combine(
+        dao.getAllDebtsFlow(),
+        dao.getAllDebtEventsFlow(),
+        dao.getAllAccountsFlow()
+    ) { debts, events, accounts ->
+        val eventsMap = events.groupBy { it.debtId }
+        val accountsMap = accounts.associateBy { it.id }
+        debts.map { debt ->
+            val debtEvents = eventsMap[debt.id] ?: emptyList()
+            val accName = debt.linkedAccountId?.let { accountsMap[it]?.name }
+            DebtWithDetails(
+                debt = debt,
+                events = debtEvents,
+                linkedAccountName = accName
+            )
+        }
+    }.flowOn(Dispatchers.IO)
+
+    val karzSummary: Flow<KarzSummary> = allDebtsWithDetails.map { debtsWithDetails ->
+        var totalGave = 0L
+        var totalTook = 0L
+        var dueSoonCount = 0
+        var dueSoonPaisa = 0L
+        var overdueCount = 0
+        var overduePaisa = 0L
+
+        for (item in debtsWithDetails) {
+            val remaining = item.outstandingPaisa
+            if (item.debt.direction == DebtDirection.I_GAVE) {
+                totalGave += remaining
+            } else {
+                totalTook += remaining
+            }
+
+            if (item.isDueSoon) {
+                dueSoonCount++
+                dueSoonPaisa += remaining
+            }
+            if (item.isOverdue) {
+                overdueCount++
+                overduePaisa += remaining
+            }
+        }
+
+        KarzSummary(
+            totalGavePaisa = totalGave,
+            totalTookPaisa = totalTook,
+            dueSoonCount = dueSoonCount,
+            dueSoonPaisa = dueSoonPaisa,
+            overdueCount = overdueCount,
+            overduePaisa = overduePaisa
+        )
+    }.flowOn(Dispatchers.IO)
+
+    fun getDebtDetailsFlow(debtId: Long): Flow<DebtWithDetails?> = combine(
+        dao.getAllDebtsFlow(),
+        dao.getDebtEventsForDebtFlow(debtId),
+        dao.getAllAccountsFlow()
+    ) { debts, events, accounts ->
+        val debt = debts.find { it.id == debtId } ?: return@combine null
+        val accName = debt.linkedAccountId?.let { id -> accounts.find { it.id == id }?.name }
+        DebtWithDetails(
+            debt = debt,
+            events = events,
+            linkedAccountName = accName
+        )
     }.flowOn(Dispatchers.IO)
 
     suspend fun checkAndGenerateRecurringOccurrences() = withContext(Dispatchers.IO) {
@@ -646,111 +723,398 @@ class HisaabRepository(
         dao.deleteCategory(category)
     }
 
+    // --- Karz Operations (Debt & Loan Management) ---
+    suspend fun createDebt(
+        personName: String,
+        direction: DebtDirection,
+        amountPaisa: Long,
+        dateEpochMs: Long,
+        dueDateEpochMs: Long? = null,
+        description: String = "",
+        phoneNumber: String = "",
+        notes: String = "",
+        accountId: Long? = null,
+        recordCashMovement: Boolean = false,
+        isInterestEnabled: Boolean = false,
+        interestRatePercent: Double = 0.0
+    ): Long = withContext(Dispatchers.IO) {
+        require(personName.isNotBlank()) { "Person name is required" }
+        require(amountPaisa > 0L) { "Amount must be greater than zero" }
+
+        val debt = DebtEntity(
+            personName = personName.trim(),
+            direction = direction,
+            originalPrincipalPaisa = amountPaisa,
+            dateEpochMs = dateEpochMs,
+            dueDateEpochMs = dueDateEpochMs,
+            description = description.trim(),
+            phoneNumber = phoneNumber.trim(),
+            notes = notes.trim(),
+            status = DebtStatus.ACTIVE,
+            linkedAccountId = if (recordCashMovement) accountId else null,
+            isInterestEnabled = isInterestEnabled,
+            interestRatePercent = interestRatePercent,
+            createdAtEpochMs = System.currentTimeMillis(),
+            updatedAtEpochMs = System.currentTimeMillis()
+        )
+        val debtId = dao.insertDebt(debt)
+
+        var createdTxId: Long? = null
+        if (recordCashMovement && accountId != null) {
+            val txType = if (direction == DebtDirection.I_GAVE) {
+                TransactionType.DEBT_LENT
+            } else {
+                TransactionType.DEBT_BORROWED
+            }
+            val txNote = if (direction == DebtDirection.I_GAVE) {
+                "Karz Lent to ${personName.trim()}" + if (description.isNotBlank()) " · $description" else ""
+            } else {
+                "Karz Borrowed from ${personName.trim()}" + if (description.isNotBlank()) " · $description" else ""
+            }
+            val tx = TransactionEntity(
+                type = txType,
+                amountPaisa = amountPaisa,
+                fromAccountId = if (direction == DebtDirection.I_GAVE) accountId else null,
+                toAccountId = if (direction == DebtDirection.I_TOOK) accountId else null,
+                categoryId = null,
+                note = txNote,
+                debtId = debtId,
+                dateEpochMs = dateEpochMs
+            )
+            createdTxId = dao.insertTransaction(tx)
+        }
+
+        val event = DebtEventEntity(
+            debtId = debtId,
+            type = DebtEventType.ORIGINAL_ADVANCE,
+            amountPaisa = amountPaisa,
+            dateEpochMs = dateEpochMs,
+            note = "Original amount" + if (description.isNotBlank()) ": $description" else "",
+            accountId = if (recordCashMovement) accountId else null,
+            transactionId = createdTxId
+        )
+        dao.insertDebtEvent(event)
+        debtId
+    }
+
+    suspend fun recordDebtRepayment(
+        debtId: Long,
+        amountPaisa: Long,
+        dateEpochMs: Long,
+        accountId: Long? = null,
+        recordCashMovement: Boolean = false,
+        note: String = ""
+    ): Long = withContext(Dispatchers.IO) {
+        val debt = dao.getDebtById(debtId) ?: throw IllegalArgumentException("Debt not found")
+        val events = dao.getDebtEventsForDebt(debtId)
+        val totalPrincipal = debt.originalPrincipalPaisa + events.filter { it.type == DebtEventType.ADDITIONAL_ADVANCE }.sumOf { it.amountPaisa }
+        val currentRepaid = events.filter { it.type == DebtEventType.REPAYMENT }.sumOf { it.amountPaisa }
+        val currentAdjustments = events.filter { it.type == DebtEventType.ADJUSTMENT }.sumOf { it.amountPaisa }
+        val currentOutstanding = (totalPrincipal - currentRepaid + currentAdjustments).coerceAtLeast(0L)
+
+        require(amountPaisa > 0L) { "Repayment amount must be positive" }
+        require(amountPaisa <= currentOutstanding) { "Repayment cannot exceed outstanding balance" }
+
+        var createdTxId: Long? = null
+        if (recordCashMovement && accountId != null) {
+            val txType = if (debt.direction == DebtDirection.I_GAVE) {
+                TransactionType.DEBT_REPAYMENT_IN
+            } else {
+                TransactionType.DEBT_REPAYMENT_OUT
+            }
+            val txNote = if (debt.direction == DebtDirection.I_GAVE) {
+                "Karz Repayment received from ${debt.personName}" + if (note.isNotBlank()) " · $note" else ""
+            } else {
+                "Karz Repayment paid to ${debt.personName}" + if (note.isNotBlank()) " · $note" else ""
+            }
+            val tx = TransactionEntity(
+                type = txType,
+                amountPaisa = amountPaisa,
+                fromAccountId = if (debt.direction == DebtDirection.I_TOOK) accountId else null,
+                toAccountId = if (debt.direction == DebtDirection.I_GAVE) accountId else null,
+                categoryId = null,
+                note = txNote,
+                debtId = debtId,
+                dateEpochMs = dateEpochMs
+            )
+            createdTxId = dao.insertTransaction(tx)
+        }
+
+        val event = DebtEventEntity(
+            debtId = debtId,
+            type = DebtEventType.REPAYMENT,
+            amountPaisa = amountPaisa,
+            dateEpochMs = dateEpochMs,
+            note = note.trim().ifEmpty { "Repayment" },
+            accountId = if (recordCashMovement) accountId else null,
+            transactionId = createdTxId
+        )
+        val eventId = dao.insertDebtEvent(event)
+
+        val newRepaid = currentRepaid + amountPaisa
+        val newOutstanding = (totalPrincipal - newRepaid + currentAdjustments).coerceAtLeast(0L)
+        val newStatus = if (newOutstanding == 0L) {
+            DebtStatus.SETTLED
+        } else {
+            DebtStatus.PARTIALLY_PAID
+        }
+
+        dao.updateDebt(
+            debt.copy(
+                status = newStatus,
+                settledAtEpochMs = if (newStatus == DebtStatus.SETTLED) System.currentTimeMillis() else null,
+                updatedAtEpochMs = System.currentTimeMillis()
+            )
+        )
+        eventId
+    }
+
+    suspend fun recordAdditionalAdvance(
+        debtId: Long,
+        amountPaisa: Long,
+        dateEpochMs: Long,
+        accountId: Long? = null,
+        recordCashMovement: Boolean = false,
+        note: String = ""
+    ): Long = withContext(Dispatchers.IO) {
+        val debt = dao.getDebtById(debtId) ?: throw IllegalArgumentException("Debt not found")
+        require(amountPaisa > 0L) { "Advance amount must be greater than zero" }
+
+        var createdTxId: Long? = null
+        if (recordCashMovement && accountId != null) {
+            val txType = if (debt.direction == DebtDirection.I_GAVE) {
+                TransactionType.DEBT_LENT
+            } else {
+                TransactionType.DEBT_BORROWED
+            }
+            val txNote = if (debt.direction == DebtDirection.I_GAVE) {
+                "Additional Karz to ${debt.personName}" + if (note.isNotBlank()) " · $note" else ""
+            } else {
+                "Additional Karz from ${debt.personName}" + if (note.isNotBlank()) " · $note" else ""
+            }
+            val tx = TransactionEntity(
+                type = txType,
+                amountPaisa = amountPaisa,
+                fromAccountId = if (debt.direction == DebtDirection.I_GAVE) accountId else null,
+                toAccountId = if (debt.direction == DebtDirection.I_TOOK) accountId else null,
+                categoryId = null,
+                note = txNote,
+                debtId = debtId,
+                dateEpochMs = dateEpochMs
+            )
+            createdTxId = dao.insertTransaction(tx)
+        }
+
+        val event = DebtEventEntity(
+            debtId = debtId,
+            type = DebtEventType.ADDITIONAL_ADVANCE,
+            amountPaisa = amountPaisa,
+            dateEpochMs = dateEpochMs,
+            note = note.trim().ifEmpty { "Additional Advance" },
+            accountId = if (recordCashMovement) accountId else null,
+            transactionId = createdTxId
+        )
+        val eventId = dao.insertDebtEvent(event)
+
+        val newStatus = if (debt.status == DebtStatus.SETTLED) DebtStatus.ACTIVE else debt.status
+        dao.updateDebt(
+            debt.copy(
+                status = newStatus,
+                settledAtEpochMs = null,
+                updatedAtEpochMs = System.currentTimeMillis()
+            )
+        )
+        eventId
+    }
+
+    suspend fun settleDebtWithAdjustment(
+        debtId: Long,
+        reason: String
+    ) = withContext(Dispatchers.IO) {
+        val debt = dao.getDebtById(debtId) ?: throw IllegalArgumentException("Debt not found")
+        require(reason.isNotBlank()) { "Settlement / write-off reason is required" }
+        val events = dao.getDebtEventsForDebt(debtId)
+        val totalPrincipal = debt.originalPrincipalPaisa + events.filter { it.type == DebtEventType.ADDITIONAL_ADVANCE }.sumOf { it.amountPaisa }
+        val currentRepaid = events.filter { it.type == DebtEventType.REPAYMENT }.sumOf { it.amountPaisa }
+        val currentAdjustments = events.filter { it.type == DebtEventType.ADJUSTMENT }.sumOf { it.amountPaisa }
+        val currentOutstanding = (totalPrincipal - currentRepaid + currentAdjustments).coerceAtLeast(0L)
+
+        if (currentOutstanding > 0L) {
+            val event = DebtEventEntity(
+                debtId = debtId,
+                type = DebtEventType.WRITE_OFF,
+                amountPaisa = currentOutstanding,
+                dateEpochMs = System.currentTimeMillis(),
+                note = "Written off: ${reason.trim()}"
+            )
+            dao.insertDebtEvent(event)
+        }
+
+        dao.updateDebt(
+            debt.copy(
+                status = DebtStatus.WRITTEN_OFF,
+                writtenOffReason = reason.trim(),
+                settledAtEpochMs = System.currentTimeMillis(),
+                updatedAtEpochMs = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun updateDebtDueDate(debtId: Long, newDueDateEpochMs: Long?) = withContext(Dispatchers.IO) {
+        val debt = dao.getDebtById(debtId) ?: return@withContext
+        dao.updateDebt(debt.copy(dueDateEpochMs = newDueDateEpochMs, updatedAtEpochMs = System.currentTimeMillis()))
+    }
+
+    suspend fun updateDebtDetails(
+        debtId: Long,
+        personName: String,
+        notes: String,
+        phoneNumber: String
+    ) = withContext(Dispatchers.IO) {
+        val debt = dao.getDebtById(debtId) ?: return@withContext
+        dao.updateDebt(
+            debt.copy(
+                personName = personName.trim(),
+                notes = notes.trim(),
+                phoneNumber = phoneNumber.trim(),
+                updatedAtEpochMs = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun deleteDebt(debtId: Long) = withContext(Dispatchers.IO) {
+        dao.deleteDebtEventsForDebt(debtId)
+        dao.deleteDebtById(debtId)
+    }
+
     suspend fun exportDataAsJsonFile(): File = withContext(Dispatchers.IO) {
         val root = JSONObject()
         root.put("app", "Hisaab Do Bhai")
         root.put("version", "2.1")
         root.put("exportedAtEpochMs", System.currentTimeMillis())
 
-        val db = HisaabDatabase.getInstance(context)
-
         // Accounts
         val accountsArray = JSONArray()
-        db.query("SELECT * FROM accounts", null).use { c ->
-            while (c.moveToNext()) {
-                val obj = JSONObject().apply {
-                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                    put("name", c.getString(c.getColumnIndexOrThrow("name")))
-                    put("type", c.getString(c.getColumnIndexOrThrow("type")))
-                    put("openingBalancePaisa", c.getLong(c.getColumnIndexOrThrow("openingBalancePaisa")))
-                    put("colorHex", c.getString(c.getColumnIndexOrThrow("colorHex")))
-                    put("isArchived", c.getInt(c.getColumnIndexOrThrow("isArchived")) == 1)
-                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                }
-                accountsArray.put(obj)
+        dao.getAllAccountsFlow().first().forEach { acc ->
+            val obj = JSONObject().apply {
+                put("id", acc.id)
+                put("name", acc.name)
+                put("type", acc.type.name)
+                put("openingBalancePaisa", acc.openingBalancePaisa)
+                put("colorHex", acc.colorHex)
+                put("isArchived", acc.isArchived)
+                put("createdAtEpochMs", acc.createdAtEpochMs)
             }
+            accountsArray.put(obj)
         }
         root.put("accounts", accountsArray)
 
         // Categories
         val categoriesArray = JSONArray()
-        db.query("SELECT * FROM categories", null).use { c ->
-            while (c.moveToNext()) {
-                val obj = JSONObject().apply {
-                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                    put("name", c.getString(c.getColumnIndexOrThrow("name")))
-                    put("type", c.getString(c.getColumnIndexOrThrow("type")))
-                    put("iconKey", c.getString(c.getColumnIndexOrThrow("iconKey")))
-                    put("colorHex", c.getString(c.getColumnIndexOrThrow("colorHex")))
-                    val limitIdx = c.getColumnIndexOrThrow("monthlyLimitPaisa")
-                    if (!c.isNull(limitIdx)) put("monthlyLimitPaisa", c.getLong(limitIdx))
-                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                }
-                categoriesArray.put(obj)
+        dao.getAllCategoriesFlow().first().forEach { cat ->
+            val obj = JSONObject().apply {
+                put("id", cat.id)
+                put("name", cat.name)
+                put("type", cat.type.name)
+                put("iconKey", cat.iconKey)
+                put("colorHex", cat.colorHex)
+                cat.monthlyLimitPaisa?.let { put("monthlyLimitPaisa", it) }
+                put("createdAtEpochMs", cat.createdAtEpochMs)
             }
+            categoriesArray.put(obj)
         }
         root.put("categories", categoriesArray)
 
         // Transactions
         val txArray = JSONArray()
-        db.query("SELECT * FROM transactions", null).use { c ->
-            while (c.moveToNext()) {
-                val obj = JSONObject().apply {
-                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                    put("type", c.getString(c.getColumnIndexOrThrow("type")))
-                    put("amountPaisa", c.getLong(c.getColumnIndexOrThrow("amountPaisa")))
-                    val fromIdx = c.getColumnIndexOrThrow("fromAccountId")
-                    if (!c.isNull(fromIdx)) put("fromAccountId", c.getLong(fromIdx))
-                    val toIdx = c.getColumnIndexOrThrow("toAccountId")
-                    if (!c.isNull(toIdx)) put("toAccountId", c.getLong(toIdx))
-                    val catIdx = c.getColumnIndexOrThrow("categoryId")
-                    if (!c.isNull(catIdx)) put("categoryId", c.getLong(catIdx))
-                    put("note", c.getString(c.getColumnIndexOrThrow("note")))
-                    put("dateEpochMs", c.getLong(c.getColumnIndexOrThrow("dateEpochMs")))
-                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                }
-                txArray.put(obj)
+        dao.getAllTransactionsFlow().first().forEach { tx ->
+            val obj = JSONObject().apply {
+                put("id", tx.id)
+                put("type", tx.type.name)
+                put("amountPaisa", tx.amountPaisa)
+                tx.fromAccountId?.let { put("fromAccountId", it) }
+                tx.toAccountId?.let { put("toAccountId", it) }
+                tx.categoryId?.let { put("categoryId", it) }
+                put("note", tx.note)
+                put("dateEpochMs", tx.dateEpochMs)
+                tx.debtId?.let { put("debtId", it) }
+                put("createdAtEpochMs", tx.createdAtEpochMs)
             }
+            txArray.put(obj)
         }
         root.put("transactions", txArray)
 
         // Needs
         val needsArray = JSONArray()
-        db.query("SELECT * FROM needs", null).use { c ->
-            while (c.moveToNext()) {
-                val obj = JSONObject().apply {
-                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                    put("name", c.getString(c.getColumnIndexOrThrow("name")))
-                    val priceIdx = c.getColumnIndexOrThrow("expectedPricePaisa")
-                    if (!c.isNull(priceIdx)) put("expectedPricePaisa", c.getLong(priceIdx))
-                    put("whereToGet", c.getString(c.getColumnIndexOrThrow("whereToGet")))
-                    put("externalUrl", c.getString(c.getColumnIndexOrThrow("externalUrl")))
-                    put("note", c.getString(c.getColumnIndexOrThrow("note")))
-                    put("isDone", c.getInt(c.getColumnIndexOrThrow("isDone")) == 1)
-                    put("createdAtEpochMs", c.getLong(c.getColumnIndexOrThrow("createdAtEpochMs")))
-                }
-                needsArray.put(obj)
+        dao.getAllNeedsFlow().first().forEach { need ->
+            val obj = JSONObject().apply {
+                put("id", need.id)
+                put("name", need.name)
+                need.expectedPricePaisa?.let { put("expectedPricePaisa", it) }
+                put("whereToGet", need.whereToGet)
+                put("externalUrl", need.externalUrl)
+                put("note", need.note)
+                put("isDone", need.isDone)
+                put("createdAtEpochMs", need.createdAtEpochMs)
             }
+            needsArray.put(obj)
         }
         root.put("needs", needsArray)
 
         // Reserved amounts
         val reservedArray = JSONArray()
-        db.query("SELECT * FROM reserved_amounts", null).use { c ->
-            while (c.moveToNext()) {
-                val obj = JSONObject().apply {
-                    put("id", c.getLong(c.getColumnIndexOrThrow("id")))
-                    put("title", c.getString(c.getColumnIndexOrThrow("title")))
-                    put("amountPaisa", c.getLong(c.getColumnIndexOrThrow("amountPaisa")))
-                    val targetIdx = c.getColumnIndexOrThrow("targetDateEpochMs")
-                    if (!c.isNull(targetIdx)) put("targetDateEpochMs", c.getLong(targetIdx))
-                    put("note", c.getString(c.getColumnIndexOrThrow("note")))
-                    put("isActive", c.getInt(c.getColumnIndexOrThrow("isActive")) == 1)
-                }
-                reservedArray.put(obj)
+        dao.getAllReservedAmountsFlow().first().forEach { res ->
+            val obj = JSONObject().apply {
+                put("id", res.id)
+                put("title", res.title)
+                put("amountPaisa", res.amountPaisa)
+                res.targetDateEpochMs?.let { put("targetDateEpochMs", it) }
+                put("note", res.note)
+                put("isActive", res.isActive)
             }
+            reservedArray.put(obj)
         }
         root.put("reservedAmounts", reservedArray)
+
+        // Debts
+        val debtsArray = JSONArray()
+        dao.getAllDebtsFlow().first().forEach { debt ->
+            val obj = JSONObject().apply {
+                put("id", debt.id)
+                put("personName", debt.personName)
+                put("direction", debt.direction.name)
+                put("originalPrincipalPaisa", debt.originalPrincipalPaisa)
+                put("dateEpochMs", debt.dateEpochMs)
+                debt.dueDateEpochMs?.let { put("dueDateEpochMs", it) }
+                put("description", debt.description)
+                put("phoneNumber", debt.phoneNumber)
+                put("notes", debt.notes)
+                put("status", debt.status.name)
+                debt.linkedAccountId?.let { put("linkedAccountId", it) }
+                put("createdAtEpochMs", debt.createdAtEpochMs)
+                put("updatedAtEpochMs", debt.updatedAtEpochMs)
+            }
+            debtsArray.put(obj)
+        }
+        root.put("debts", debtsArray)
+
+        // Debt Events
+        val debtEventsArray = JSONArray()
+        dao.getAllDebtEventsFlow().first().forEach { ev ->
+            val obj = JSONObject().apply {
+                put("id", ev.id)
+                put("debtId", ev.debtId)
+                put("type", ev.type.name)
+                put("amountPaisa", ev.amountPaisa)
+                put("dateEpochMs", ev.dateEpochMs)
+                put("note", ev.note)
+                ev.accountId?.let { put("accountId", it) }
+                ev.transactionId?.let { put("transactionId", it) }
+                put("createdAtEpochMs", ev.createdAtEpochMs)
+            }
+            debtEventsArray.put(obj)
+        }
+        root.put("debtEvents", debtEventsArray)
 
         val exportDir = File(context.filesDir, "exports").apply { mkdirs() }
         val exportFile = File(exportDir, "hisaab_backup_${System.currentTimeMillis()}.json")
@@ -769,6 +1133,8 @@ class HisaabRepository(
             val categoriesArray = root.getJSONArray("categories")
             val txArray = root.optJSONArray("transactions") ?: JSONArray()
             val needsArray = root.optJSONArray("needs") ?: JSONArray()
+            val debtsArray = root.optJSONArray("debts") ?: JSONArray()
+            val debtEventsArray = root.optJSONArray("debtEvents") ?: JSONArray()
 
             // Restore Accounts
             val accounts = mutableListOf<AccountEntity>()
@@ -823,7 +1189,8 @@ class HisaabRepository(
                         toAccountId = if (obj.has("toAccountId")) obj.getLong("toAccountId") else null,
                         categoryId = if (obj.has("categoryId")) obj.getLong("categoryId") else null,
                         note = obj.optString("note", ""),
-                        dateEpochMs = obj.optLong("dateEpochMs", System.currentTimeMillis())
+                        dateEpochMs = obj.optLong("dateEpochMs", System.currentTimeMillis()),
+                        debtId = if (obj.has("debtId")) obj.getLong("debtId") else null
                     )
                 )
             }
@@ -844,7 +1211,47 @@ class HisaabRepository(
                 )
             }
 
-            Result.success("Restored ${accounts.size} accounts, ${categories.size} categories, ${txArray.length()} transactions, and ${needsArray.length()} needs.")
+            // Restore Debts
+            for (i in 0 until debtsArray.length()) {
+                val obj = debtsArray.getJSONObject(i)
+                dao.insertDebt(
+                    DebtEntity(
+                        id = obj.optLong("id", 0),
+                        personName = obj.getString("personName"),
+                        direction = DebtDirection.valueOf(obj.getString("direction")),
+                        originalPrincipalPaisa = obj.getLong("originalPrincipalPaisa"),
+                        dateEpochMs = obj.optLong("dateEpochMs", System.currentTimeMillis()),
+                        dueDateEpochMs = if (obj.has("dueDateEpochMs")) obj.getLong("dueDateEpochMs") else null,
+                        description = obj.optString("description", ""),
+                        phoneNumber = obj.optString("phoneNumber", ""),
+                        notes = obj.optString("notes", ""),
+                        status = DebtStatus.valueOf(obj.optString("status", "ACTIVE")),
+                        linkedAccountId = if (obj.has("linkedAccountId")) obj.getLong("linkedAccountId") else null,
+                        createdAtEpochMs = obj.optLong("createdAtEpochMs", System.currentTimeMillis()),
+                        updatedAtEpochMs = obj.optLong("updatedAtEpochMs", System.currentTimeMillis())
+                    )
+                )
+            }
+
+            // Restore Debt Events
+            for (i in 0 until debtEventsArray.length()) {
+                val obj = debtEventsArray.getJSONObject(i)
+                dao.insertDebtEvent(
+                    DebtEventEntity(
+                        id = obj.optLong("id", 0),
+                        debtId = obj.getLong("debtId"),
+                        type = DebtEventType.valueOf(obj.getString("type")),
+                        amountPaisa = obj.getLong("amountPaisa"),
+                        dateEpochMs = obj.optLong("dateEpochMs", System.currentTimeMillis()),
+                        note = obj.optString("note", ""),
+                        accountId = if (obj.has("accountId")) obj.getLong("accountId") else null,
+                        transactionId = if (obj.has("transactionId")) obj.getLong("transactionId") else null,
+                        createdAtEpochMs = obj.optLong("createdAtEpochMs", System.currentTimeMillis())
+                    )
+                )
+            }
+
+            Result.success("Restored ${accounts.size} accounts, ${categories.size} categories, ${txArray.length()} transactions, ${needsArray.length()} needs, and ${debtsArray.length()} debts.")
         } catch (e: Exception) {
             Result.failure(e)
         }

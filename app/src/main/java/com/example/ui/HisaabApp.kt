@@ -20,14 +20,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.remember
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.data.model.DebtDirection
 import com.example.ui.navigation.NavScreen
+import com.example.ui.screens.AddKarzScreen
 import com.example.ui.screens.AddTransactionScreen
+import com.example.ui.screens.DebtDetailScreen
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.KarzScreen
 import com.example.ui.screens.NeedsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.ClayAccentLime
@@ -59,6 +64,8 @@ fun HisaabApp(
     val pendingRecurring by viewModel.pendingRecurringItems.collectAsStateWithLifecycle()
     val budgetProgressList by viewModel.budgetProgressList.collectAsStateWithLifecycle()
     val recurringRules by viewModel.recurringRules.collectAsStateWithLifecycle()
+    val debts by viewModel.debts.collectAsStateWithLifecycle()
+    val karzSummary by viewModel.karzSummary.collectAsStateWithLifecycle()
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -130,6 +137,12 @@ fun HisaabApp(
                     pendingRecurring = pendingRecurring,
                     budgets = budgetProgressList,
                     privacyMode = privacyMode,
+                    karzSummary = karzSummary,
+                    onNavigateToKarz = {
+                        navController.navigate(NavScreen.Karz.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onTogglePrivacy = { viewModel.setPrivacyMode(!privacyMode) },
                     onConfirmRecurring = { viewModel.confirmRecurringPayment(it) },
                     onSkipRecurring = { viewModel.skipRecurringPayment(it) },
@@ -146,6 +159,68 @@ fun HisaabApp(
                     },
                     onToggleReserveActive = { viewModel.toggleReservedAmountActive(it) },
                     onDeleteReserve = { viewModel.deleteReservedAmount(it) }
+                )
+            }
+
+            composable(NavScreen.Karz.route) {
+                KarzScreen(
+                    summary = karzSummary,
+                    debts = debts,
+                    privacyMode = privacyMode,
+                    onNavigateToAddGave = {
+                        navController.navigate("add_karz/I_GAVE")
+                    },
+                    onNavigateToAddTook = {
+                        navController.navigate("add_karz/I_TOOK")
+                    },
+                    onDebtSelected = { debtId ->
+                        navController.navigate("debt_detail/$debtId")
+                    }
+                )
+            }
+
+            composable("add_karz/{direction}") { backStackEntry ->
+                val directionStr = backStackEntry.arguments?.getString("direction") ?: "I_GAVE"
+                val dir = if (directionStr == "I_TOOK") DebtDirection.I_TOOK else DebtDirection.I_GAVE
+                AddKarzScreen(
+                    initialDirection = dir,
+                    accounts = activeAccounts,
+                    onSaveDebt = { person, direction, amount, date, due, desc, phone, notes, accId, trackCash ->
+                        viewModel.createDebt(person, direction, amount, date, due, desc, phone, notes, accId, trackCash) {
+                            navController.popBackStack()
+                        }
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("debt_detail/{debtId}") { backStackEntry ->
+                val debtId = backStackEntry.arguments?.getString("debtId")?.toLongOrNull() ?: 0L
+                val debtDetailsFlow = remember(debtId) { viewModel.getDebtDetails(debtId) }
+                val debtDetails by debtDetailsFlow.collectAsStateWithLifecycle(initialValue = null)
+
+                DebtDetailScreen(
+                    debtDetails = debtDetails,
+                    accounts = activeAccounts,
+                    privacyMode = privacyMode,
+                    onRecordRepayment = { id, amount, date, accId, trackCash, note ->
+                        viewModel.recordDebtRepayment(id, amount, date, accId, trackCash, note)
+                    },
+                    onRecordAdvance = { id, amount, date, accId, trackCash, note ->
+                        viewModel.recordAdditionalAdvance(id, amount, date, accId, trackCash, note)
+                    },
+                    onSettleWithAdjustment = { id, reason ->
+                        viewModel.settleDebtWithAdjustment(id, reason)
+                    },
+                    onChangeDueDate = { id, newDue ->
+                        viewModel.updateDebtDueDate(id, newDue)
+                    },
+                    onDeleteDebt = { id ->
+                        viewModel.deleteDebt(id) {
+                            navController.popBackStack()
+                        }
+                    },
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

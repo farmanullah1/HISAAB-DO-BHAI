@@ -190,6 +190,9 @@ interface HisaabDao {
     fun getPeriodExpenseFlow(startEpochMs: Long, endEpochMs: Long): Flow<Long?>
 
     // --- Needs / Shopping Planner ---
+    @Query("SELECT * FROM needs ORDER BY id ASC")
+    fun getAllNeedsFlow(): Flow<List<NeedEntity>>
+
     @Query("SELECT * FROM needs WHERE isDone = 0 ORDER BY id DESC")
     fun getActiveNeedsFlow(): Flow<List<NeedEntity>>
 
@@ -310,4 +313,10 @@ interface HisaabDao {
 
     @Query("SELECT COUNT(*) FROM debt_events")
     suspend fun getDebtEventsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM needs")
+    suspend fun getNeedsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM recurring_rules")
+    suspend fun getRecurringRulesCount(): Int
 }

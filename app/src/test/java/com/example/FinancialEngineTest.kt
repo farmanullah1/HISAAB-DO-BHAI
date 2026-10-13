@@ -266,4 +266,194 @@ class FinancialEngineTest {
         assertEquals(8000000L, dao.getAccountBalanceFlow(bankId).first())
         assertEquals(1, dao.getTransactionsCount())
     }
+
+    @Test
+    fun scenarioKarz_lendingReducesAccountBalanceAndRepaymentsRestoreIt() = runBlocking {
+        // Initial Cash Wallet: PKR 30,000 (3,000,000 paisa)
+        val cashWalletId = dao.insertAccount(
+            AccountEntity(
+                name = "Cash Wallet",
+                type = AccountType.CASH_WALLET,
+                openingBalancePaisa = 3000000L,
+                colorHex = "#7C9A6B"
+            )
+        )
+        assertEquals(3000000L, dao.getAccountBalanceFlow(cashWalletId).first())
+
+        // 1. Lent PKR 10,000 (1,000,000 paisa) to Ahmed
+        val debtId = dao.insertDebt(
+            com.example.data.model.DebtEntity(
+                personName = "Ahmed",
+                direction = com.example.data.model.DebtDirection.I_GAVE,
+                originalPrincipalPaisa = 1000000L,
+                linkedAccountId = cashWalletId
+            )
+        )
+        dao.insertTransaction(
+            TransactionEntity(
+                type = TransactionType.DEBT_LENT,
+                amountPaisa = 1000000L,
+                fromAccountId = cashWalletId,
+                note = "Karz lent to Ahmed",
+                debtId = debtId,
+                dateEpochMs = System.currentTimeMillis()
+            )
+        )
+        dao.insertDebtEvent(
+            com.example.data.model.DebtEventEntity(
+                debtId = debtId,
+                type = com.example.data.model.DebtEventType.ORIGINAL_ADVANCE,
+                amountPaisa = 1000000L,
+                accountId = cashWalletId
+            )
+        )
+
+        // Cash Wallet after lending must be PKR 20,000 (2,000,000 paisa)
+        assertEquals(2000000L, dao.getAccountBalanceFlow(cashWalletId).first())
+
+        // 2. Partial repayment 1: PKR 3,000 (300,000 paisa) received
+        dao.insertTransaction(
+            TransactionEntity(
+                type = TransactionType.DEBT_REPAYMENT_IN,
+                amountPaisa = 300000L,
+                toAccountId = cashWalletId,
+                note = "Repayment from Ahmed",
+                debtId = debtId,
+                dateEpochMs = System.currentTimeMillis()
+            )
+        )
+        dao.insertDebtEvent(
+            com.example.data.model.DebtEventEntity(
+                debtId = debtId,
+                type = com.example.data.model.DebtEventType.REPAYMENT,
+                amountPaisa = 300000L,
+                accountId = cashWalletId
+            )
+        )
+
+        // Cash Wallet increases to PKR 23,000 (2,300,000 paisa)
+        assertEquals(2300000L, dao.getAccountBalanceFlow(cashWalletId).first())
+
+        // Check debt outstanding
+        val events = dao.getDebtEventsForDebt(debtId)
+        val totalRepaid = events.filter { it.type == com.example.data.model.DebtEventType.REPAYMENT }.sumOf { it.amountPaisa }
+        assertEquals(300000L, totalRepaid)
+        val outstanding = 1000000L - totalRepaid
+        assertEquals(700000L, outstanding) // PKR 7,000 remaining
+
+        // 3. Final repayment: PKR 7,000 (700,000 paisa) received
+        dao.insertTransaction(
+            TransactionEntity(
+                type = TransactionType.DEBT_REPAYMENT_IN,
+                amountPaisa = 700000L,
+                toAccountId = cashWalletId,
+                note = "Final repayment from Ahmed",
+                debtId = debtId,
+                dateEpochMs = System.currentTimeMillis()
+            )
+        )
+        dao.insertDebtEvent(
+            com.example.data.model.DebtEventEntity(
+                debtId = debtId,
+                type = com.example.data.model.DebtEventType.REPAYMENT,
+                amountPaisa = 700000L,
+                accountId = cashWalletId
+            )
+        )
+
+        // Cash Wallet is fully restored to original PKR 30,000 (3,000,000 paisa)
+        assertEquals(3000000L, dao.getAccountBalanceFlow(cashWalletId).first())
+        val finalEvents = dao.getDebtEventsForDebt(debtId)
+        val finalRepaid = finalEvents.filter { it.type == com.example.data.model.DebtEventType.REPAYMENT }.sumOf { it.amountPaisa }
+        assertEquals(1000000L, finalRepaid)
+        assertEquals(0L, 1000000L - finalRepaid) // Fully settled
+    }
+
+    @Test
+    fun scenarioKarz_borrowingIncreasesAccountBalanceAndRepaymentDeductsIt() = runBlocking {
+        // Initial Cash Wallet: PKR 5,000 (500,000 paisa)
+        val cashWalletId = dao.insertAccount(
+            AccountEntity(
+                name = "Cash Wallet",
+                type = AccountType.CASH_WALLET,
+                openingBalancePaisa = 500000L,
+                colorHex = "#7C9A6B"
+            )
+        )
+        assertEquals(500000L, dao.getAccountBalanceFlow(cashWalletId).first())
+
+        // Borrowed PKR 20,000 (2,000,000 paisa) from Ali into Cash Wallet
+        val debtId = dao.insertDebt(
+            com.example.data.model.DebtEntity(
+                personName = "Ali",
+                direction = com.example.data.model.DebtDirection.I_TOOK,
+                originalPrincipalPaisa = 2000000L,
+                linkedAccountId = cashWalletId
+            )
+        )
+        dao.insertTransaction(
+            TransactionEntity(
+                type = TransactionType.DEBT_BORROWED,
+                amountPaisa = 2000000L,
+                toAccountId = cashWalletId,
+                note = "Karz borrowed from Ali",
+                debtId = debtId,
+                dateEpochMs = System.currentTimeMillis()
+            )
+        )
+
+        // Cash Wallet after borrowing must be PKR 25,000 (2,500,000 paisa)
+        assertEquals(2500000L, dao.getAccountBalanceFlow(cashWalletId).first())
+
+        // Record repayment of PKR 5,000 (500,000 paisa) paid back to Ali
+        dao.insertTransaction(
+            TransactionEntity(
+                type = TransactionType.DEBT_REPAYMENT_OUT,
+                amountPaisa = 500000L,
+                fromAccountId = cashWalletId,
+                note = "Repayment paid to Ali",
+                debtId = debtId,
+                dateEpochMs = System.currentTimeMillis()
+            )
+        )
+
+        // Cash Wallet decreases back to PKR 20,000 (2,000,000 paisa)
+        assertEquals(2000000L, dao.getAccountBalanceFlow(cashWalletId).first())
+    }
+
+    @Test
+    fun scenarioKarz_historicalDebtDoesNotChangeAccountBalance() = runBlocking {
+        val cashWalletId = dao.insertAccount(
+            AccountEntity(
+                name = "Cash Wallet",
+                type = AccountType.CASH_WALLET,
+                openingBalancePaisa = 5000000L, // 50,000 PKR
+                colorHex = "#7C9A6B"
+            )
+        )
+        assertEquals(5000000L, dao.getAccountBalanceFlow(cashWalletId).first())
+
+        // Insert historical debt without transactions
+        val debtId = dao.insertDebt(
+            com.example.data.model.DebtEntity(
+                personName = "Old Friend",
+                direction = com.example.data.model.DebtDirection.I_GAVE,
+                originalPrincipalPaisa = 2500000L, // 25,000 PKR
+                linkedAccountId = null // No account linked
+            )
+        )
+        dao.insertDebtEvent(
+            com.example.data.model.DebtEventEntity(
+                debtId = debtId,
+                type = com.example.data.model.DebtEventType.ORIGINAL_ADVANCE,
+                amountPaisa = 2500000L,
+                accountId = null
+            )
+        )
+
+        // Account balance MUST remain untouched!
+        assertEquals(5000000L, dao.getAccountBalanceFlow(cashWalletId).first())
+        assertEquals(0, dao.getTransactionsCount())
+    }
 }
+

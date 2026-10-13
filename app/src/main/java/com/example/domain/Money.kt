@@ -42,8 +42,14 @@ object Money {
         val absPaisa = kotlin.math.abs(paisa)
         val base = formatPkr(absPaisa)
         return when (type) {
-            TransactionType.INCOME -> "+$base"
-            TransactionType.EXPENSE -> "-$base"
+            TransactionType.INCOME,
+            TransactionType.DEBT_BORROWED,
+            TransactionType.DEBT_REPAYMENT_IN -> "+$base"
+
+            TransactionType.EXPENSE,
+            TransactionType.DEBT_LENT,
+            TransactionType.DEBT_REPAYMENT_OUT -> "-$base"
+
             TransactionType.TRANSFER -> base
         }
     }

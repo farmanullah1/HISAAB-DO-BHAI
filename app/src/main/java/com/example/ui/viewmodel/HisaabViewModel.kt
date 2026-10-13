@@ -10,6 +10,11 @@ import com.example.data.model.AccountWithBalance
 import com.example.data.model.BudgetProgressItem
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
+import com.example.data.model.DebtDirection
+import com.example.data.model.DebtEntity
+import com.example.data.model.DebtEventEntity
+import com.example.data.model.DebtWithDetails
+import com.example.data.model.KarzSummary
 import com.example.data.model.MonthlySummary
 import com.example.data.model.NeedEntity
 import com.example.data.model.PendingRecurringItem
@@ -20,6 +25,7 @@ import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
 import com.example.data.repository.HisaabRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -95,6 +101,14 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
 
     val recurringRules: StateFlow<List<RecurringRuleEntity>> = repository.recurringRules
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val debts: StateFlow<List<DebtWithDetails>> = repository.allDebtsWithDetails
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val karzSummary: StateFlow<KarzSummary> = repository.karzSummary
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), KarzSummary(0L, 0L, 0, 0L, 0, 0L))
+
+    fun getDebtDetails(debtId: Long): Flow<DebtWithDetails?> = repository.getDebtDetailsFlow(debtId)
 
     fun recordExpense(
         amountPaisa: Long,
@@ -267,5 +281,114 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
 
     suspend fun restoreDataFromJson(jsonString: String): Result<String> {
         return repository.restoreDataFromJson(jsonString)
+    }
+
+    // --- Karz Actions ---
+    fun createDebt(
+        personName: String,
+        direction: DebtDirection,
+        amountPaisa: Long,
+        dateEpochMs: Long,
+        dueDateEpochMs: Long? = null,
+        description: String = "",
+        phoneNumber: String = "",
+        notes: String = "",
+        accountId: Long? = null,
+        recordCashMovement: Boolean = false,
+        onSuccess: (Long) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val debtId = repository.createDebt(
+                personName = personName,
+                direction = direction,
+                amountPaisa = amountPaisa,
+                dateEpochMs = dateEpochMs,
+                dueDateEpochMs = dueDateEpochMs,
+                description = description,
+                phoneNumber = phoneNumber,
+                notes = notes,
+                accountId = accountId,
+                recordCashMovement = recordCashMovement
+            )
+            onSuccess(debtId)
+        }
+    }
+
+    fun recordDebtRepayment(
+        debtId: Long,
+        amountPaisa: Long,
+        dateEpochMs: Long,
+        accountId: Long? = null,
+        recordCashMovement: Boolean = false,
+        note: String = "",
+        onComplete: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.recordDebtRepayment(
+                    debtId = debtId,
+                    amountPaisa = amountPaisa,
+                    dateEpochMs = dateEpochMs,
+                    accountId = accountId,
+                    recordCashMovement = recordCashMovement,
+                    note = note
+                )
+                onComplete(true, null)
+            } catch (e: Exception) {
+                onComplete(false, e.message)
+            }
+        }
+    }
+
+    fun recordAdditionalAdvance(
+        debtId: Long,
+        amountPaisa: Long,
+        dateEpochMs: Long,
+        accountId: Long? = null,
+        recordCashMovement: Boolean = false,
+        note: String = "",
+        onComplete: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.recordAdditionalAdvance(
+                    debtId = debtId,
+                    amountPaisa = amountPaisa,
+                    dateEpochMs = dateEpochMs,
+                    accountId = accountId,
+                    recordCashMovement = recordCashMovement,
+                    note = note
+                )
+                onComplete(true, null)
+            } catch (e: Exception) {
+                onComplete(false, e.message)
+            }
+        }
+    }
+
+    fun settleDebtWithAdjustment(debtId: Long, reason: String, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.settleDebtWithAdjustment(debtId, reason)
+            onComplete()
+        }
+    }
+
+    fun updateDebtDueDate(debtId: Long, newDueDateEpochMs: Long?) {
+        viewModelScope.launch {
+            repository.updateDebtDueDate(debtId, newDueDateEpochMs)
+        }
+    }
+
+    fun updateDebtDetails(debtId: Long, personName: String, notes: String, phoneNumber: String) {
+        viewModelScope.launch {
+            repository.updateDebtDetails(debtId, personName, notes, phoneNumber)
+        }
+    }
+
+    fun deleteDebt(debtId: Long, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.deleteDebt(debtId)
+            onComplete()
+        }
     }
 }
