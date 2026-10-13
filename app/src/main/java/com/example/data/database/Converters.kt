@@ -49,4 +49,28 @@ class Converters {
     @TypeConverter
     fun toOccurrenceStatus(value: String): OccurrenceStatus =
         runCatching { OccurrenceStatus.valueOf(value) }.getOrDefault(OccurrenceStatus.PENDING)
+
+    @TypeConverter
+    fun fromDebtDirection(value: com.example.data.model.DebtDirection): String = value.name
+
+    @TypeConverter
+    fun toDebtDirection(value: String): com.example.data.model.DebtDirection =
+        runCatching { com.example.data.model.DebtDirection.valueOf(value) }
+            .getOrDefault(com.example.data.model.DebtDirection.I_GAVE)
+
+    @TypeConverter
+    fun fromDebtStatus(value: com.example.data.model.DebtStatus): String = value.name
+
+    @TypeConverter
+    fun toDebtStatus(value: String): com.example.data.model.DebtStatus =
+        runCatching { com.example.data.model.DebtStatus.valueOf(value) }
+            .getOrDefault(com.example.data.model.DebtStatus.ACTIVE)
+
+    @TypeConverter
+    fun fromDebtEventType(value: com.example.data.model.DebtEventType): String = value.name
+
+    @TypeConverter
+    fun toDebtEventType(value: String): com.example.data.model.DebtEventType =
+        runCatching { com.example.data.model.DebtEventType.valueOf(value) }
+            .getOrDefault(com.example.data.model.DebtEventType.ORIGINAL_ADVANCE)
 }

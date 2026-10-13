@@ -9,6 +9,10 @@ import androidx.room.Update
 import com.example.data.model.AccountEntity
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
+import com.example.data.model.DebtDirection
+import com.example.data.model.DebtEntity
+import com.example.data.model.DebtEventEntity
+import com.example.data.model.DebtStatus
 import com.example.data.model.NeedEntity
 import com.example.data.model.OccurrenceStatus
 import com.example.data.model.ReceiptAttachmentEntity
@@ -64,8 +68,8 @@ interface HisaabDao {
 
     @Query("""
         SELECT COALESCE(openingBalancePaisa, 0) +
-          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'INCOME' AND toAccountId = :id), 0) -
-          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'EXPENSE' AND fromAccountId = :id), 0) +
+          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type IN ('INCOME', 'DEBT_BORROWED', 'DEBT_REPAYMENT_IN') AND toAccountId = :id), 0) -
+          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type IN ('EXPENSE', 'DEBT_LENT', 'DEBT_REPAYMENT_OUT') AND fromAccountId = :id), 0) +
           COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'TRANSFER' AND toAccountId = :id), 0) -
           COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'TRANSFER' AND fromAccountId = :id), 0)
         FROM accounts WHERE id = :id
@@ -76,8 +80,8 @@ interface HisaabDao {
         SELECT 
           a.id AS accountId,
           COALESCE(a.openingBalancePaisa, 0) +
-          COALESCE((SELECT SUM(t1.amountPaisa) FROM transactions t1 WHERE t1.type = 'INCOME' AND t1.toAccountId = a.id), 0) -
-          COALESCE((SELECT SUM(t2.amountPaisa) FROM transactions t2 WHERE t2.type = 'EXPENSE' AND t2.fromAccountId = a.id), 0) +
+          COALESCE((SELECT SUM(t1.amountPaisa) FROM transactions t1 WHERE t1.type IN ('INCOME', 'DEBT_BORROWED', 'DEBT_REPAYMENT_IN') AND t1.toAccountId = a.id), 0) -
+          COALESCE((SELECT SUM(t2.amountPaisa) FROM transactions t2 WHERE t2.type IN ('EXPENSE', 'DEBT_LENT', 'DEBT_REPAYMENT_OUT') AND t2.fromAccountId = a.id), 0) +
           COALESCE((SELECT SUM(t3.amountPaisa) FROM transactions t3 WHERE t3.type = 'TRANSFER' AND t3.toAccountId = a.id), 0) -
           COALESCE((SELECT SUM(t4.amountPaisa) FROM transactions t4 WHERE t4.type = 'TRANSFER' AND t4.fromAccountId = a.id), 0) AS balancePaisa
         FROM accounts a
@@ -87,8 +91,8 @@ interface HisaabDao {
     @Query("""
         SELECT 
           COALESCE((SELECT SUM(openingBalancePaisa) FROM accounts WHERE isArchived = 0), 0) +
-          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'INCOME' AND toAccountId IN (SELECT id FROM accounts WHERE isArchived = 0)), 0) -
-          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type = 'EXPENSE' AND fromAccountId IN (SELECT id FROM accounts WHERE isArchived = 0)), 0)
+          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type IN ('INCOME', 'DEBT_BORROWED', 'DEBT_REPAYMENT_IN') AND toAccountId IN (SELECT id FROM accounts WHERE isArchived = 0)), 0) -
+          COALESCE((SELECT SUM(amountPaisa) FROM transactions WHERE type IN ('EXPENSE', 'DEBT_LENT', 'DEBT_REPAYMENT_OUT') AND fromAccountId IN (SELECT id FROM accounts WHERE isArchived = 0)), 0)
     """)
     fun getTotalBalanceFlow(): Flow<Long?>
 
@@ -258,9 +262,52 @@ interface HisaabDao {
     @Query("SELECT COUNT(*) FROM transactions")
     suspend fun getTransactionsCount(): Int
 
-    @Query("SELECT COUNT(*) FROM needs")
-    suspend fun getNeedsCount(): Int
+    // --- Karz (Debts & Loans) ---
+    @Query("SELECT * FROM debts ORDER BY updatedAtEpochMs DESC, id DESC")
+    fun getAllDebtsFlow(): Flow<List<DebtEntity>>
 
-    @Query("SELECT COUNT(*) FROM recurring_rules")
-    suspend fun getRecurringRulesCount(): Int
+    @Query("SELECT * FROM debts WHERE direction = :direction ORDER BY updatedAtEpochMs DESC, id DESC")
+    fun getDebtsByDirectionFlow(direction: DebtDirection): Flow<List<DebtEntity>>
+
+    @Query("SELECT * FROM debts WHERE id = :id")
+    suspend fun getDebtById(id: Long): DebtEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDebt(debt: DebtEntity): Long
+
+    @Update
+    suspend fun updateDebt(debt: DebtEntity)
+
+    @Delete
+    suspend fun deleteDebt(debt: DebtEntity)
+
+    @Query("DELETE FROM debts WHERE id = :id")
+    suspend fun deleteDebtById(id: Long)
+
+    @Query("SELECT * FROM debt_events ORDER BY dateEpochMs ASC, id ASC")
+    fun getAllDebtEventsFlow(): Flow<List<DebtEventEntity>>
+
+    @Query("SELECT * FROM debt_events WHERE debtId = :debtId ORDER BY dateEpochMs ASC, id ASC")
+    fun getDebtEventsForDebtFlow(debtId: Long): Flow<List<DebtEventEntity>>
+
+    @Query("SELECT * FROM debt_events WHERE debtId = :debtId ORDER BY dateEpochMs ASC, id ASC")
+    suspend fun getDebtEventsForDebt(debtId: Long): List<DebtEventEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDebtEvent(event: DebtEventEntity): Long
+
+    @Update
+    suspend fun updateDebtEvent(event: DebtEventEntity)
+
+    @Delete
+    suspend fun deleteDebtEvent(event: DebtEventEntity)
+
+    @Query("DELETE FROM debt_events WHERE debtId = :debtId")
+    suspend fun deleteDebtEventsForDebt(debtId: Long)
+
+    @Query("SELECT COUNT(*) FROM debts")
+    suspend fun getDebtsCount(): Int
+
+    @Query("SELECT COUNT(*) FROM debt_events")
+    suspend fun getDebtEventsCount(): Int
 }

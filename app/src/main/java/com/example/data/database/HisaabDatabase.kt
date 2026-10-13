@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.data.model.AccountEntity
 import com.example.data.model.CategoryEntity
+import com.example.data.model.DebtEntity
+import com.example.data.model.DebtEventEntity
 import com.example.data.model.NeedEntity
 import com.example.data.model.ReceiptAttachmentEntity
 import com.example.data.model.RecurringOccurrenceEntity
@@ -23,9 +25,11 @@ import com.example.data.model.TransactionEntity
         ReceiptAttachmentEntity::class,
         RecurringRuleEntity::class,
         RecurringOccurrenceEntity::class,
-        ReservedAmountEntity::class
+        ReservedAmountEntity::class,
+        DebtEntity::class,
+        DebtEventEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

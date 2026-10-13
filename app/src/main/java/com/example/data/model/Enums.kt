@@ -3,7 +3,11 @@ package com.example.data.model
 enum class TransactionType {
     INCOME,
     EXPENSE,
-    TRANSFER
+    TRANSFER,
+    DEBT_LENT,
+    DEBT_BORROWED,
+    DEBT_REPAYMENT_IN,
+    DEBT_REPAYMENT_OUT
 }
 
 enum class AccountType {

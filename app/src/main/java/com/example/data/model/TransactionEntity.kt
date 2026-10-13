@@ -11,7 +11,8 @@ import androidx.room.PrimaryKey
         Index("toAccountId"),
         Index("categoryId"),
         Index("dateEpochMs"),
-        Index("recurringOccurrenceId")
+        Index("recurringOccurrenceId"),
+        Index("debtId")
     ]
 )
 data class TransactionEntity(
@@ -25,6 +26,7 @@ data class TransactionEntity(
     val note: String = "",
     val receiptPath: String? = null,
     val recurringOccurrenceId: Long? = null,
+    val debtId: Long? = null,
     val dateEpochMs: Long = System.currentTimeMillis(),
     val createdAtEpochMs: Long = System.currentTimeMillis()
 )
