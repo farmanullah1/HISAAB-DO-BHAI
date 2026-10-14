@@ -34,6 +34,10 @@ import com.example.ui.theme.ClaySurface
 import com.example.ui.theme.ClayTextPrimary
 import com.example.ui.theme.ClayTextSecondary
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+
 @Composable
 fun ClayEmptyState(
     icon: ImageVector,
@@ -41,28 +45,48 @@ fun ClayEmptyState(
     description: String,
     actionTitle: String? = null,
     onAction: (() -> Unit)? = null,
+    illustrationRes: Int? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp))
-            .padding(vertical = 36.dp, horizontal = 20.dp),
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(20.dp))
+            .padding(vertical = 32.dp, horizontal = 20.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Clay miniature illustration composition
-            Box(
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape)
-                    .background(ClaySurface),
-                contentAlignment = Alignment.Center
-            ) {
+            if (illustrationRes != null) {
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(24.dp))
+                        .background(ClaySurface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = illustrationRes),
+                        contentDescription = title,
+                        modifier = Modifier
+                            .size(110.dp)
+                            .clip(RoundedCornerShape(24.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else {
+                // Clay miniature illustration composition
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(CircleShape)
+                        .background(ClaySurface),
+                    contentAlignment = Alignment.Center
+                ) {
                 Canvas(modifier = Modifier.size(90.dp)) {
                     // Soft shadow
                     drawCircle(
@@ -84,12 +108,13 @@ fun ClayEmptyState(
                     )
                 }
 
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = ClayInkDeep,
-                    modifier = Modifier.size(36.dp)
-                )
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = ClayInkDeep,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(18.dp))

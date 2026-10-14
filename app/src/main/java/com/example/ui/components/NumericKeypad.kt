@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -78,9 +79,10 @@ private fun KeypadButton(
 
     Box(
         modifier = modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(58.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.dp, com.example.ui.theme.ClayBorderHairline, RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.material3.ripple(),

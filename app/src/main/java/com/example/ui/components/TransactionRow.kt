@@ -56,12 +56,14 @@ fun TransactionRow(
     item: TransactionItem,
     privacyMode: Boolean,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToDebtDetail: ((Long) -> Unit)? = null
 ) {
     val tx = item.transaction
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
     val formattedDate = dateFormatter.format(Date(tx.dateEpochMs))
 
+    var showDetailDialog by remember { mutableStateOf(false) }
     var showReceiptDialog by remember { mutableStateOf(false) }
 
     val (tintBg, amountColor, title) = when (tx.type) {
@@ -118,7 +120,9 @@ fun TransactionRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp)),
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp))
+            .clickable { showDetailDialog = true }
+            .testTag("transaction_row_${tx.id}"),
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(14.dp)
     ) {
@@ -264,6 +268,16 @@ fun TransactionRow(
         ReceiptViewerDialog(
             filePath = tx.receiptPath,
             onDismiss = { showReceiptDialog = false }
+        )
+    }
+
+    if (showDetailDialog) {
+        TransactionDetailDialog(
+            item = item,
+            privacyMode = privacyMode,
+            onDelete = onDelete,
+            onNavigateToDebtDetail = onNavigateToDebtDetail,
+            onDismiss = { showDetailDialog = false }
         )
     }
 }

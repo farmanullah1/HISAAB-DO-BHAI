@@ -95,6 +95,7 @@ fun HomeScreen(
     onAddReserve: (title: String, amountPaisa: Long, note: String) -> Unit = { _, _, _ -> },
     onToggleReserveActive: (ReservedAmountEntity) -> Unit = {},
     onDeleteReserve: (ReservedAmountEntity) -> Unit = {},
+    onNavigateToDebtDetail: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -306,7 +307,8 @@ fun HomeScreen(
                         title = if (searchQuery.isNotEmpty()) "No matching entries" else "No entries yet",
                         description = if (searchQuery.isNotEmpty()) "Try adjusting your search query or filters." else "Tap + below to record your first expense, income, or transfer. Your ledger is 100% offline.",
                         actionTitle = if (searchQuery.isEmpty()) "+ Record Hisaab" else null,
-                        onAction = onNavigateToAdd
+                        onAction = onNavigateToAdd,
+                        illustrationRes = if (searchQuery.isEmpty()) com.example.R.drawable.img_clay_ledger_hero else null
                     )
                 }
             } else {
@@ -317,6 +319,7 @@ fun HomeScreen(
                     TransactionRow(
                         item = item,
                         privacyMode = privacyMode,
+                        onNavigateToDebtDetail = onNavigateToDebtDetail,
                         onDelete = {
                             val txId = item.transaction.id
                             onDeleteTransaction(txId)

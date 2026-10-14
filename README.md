@@ -167,6 +167,8 @@ Hisaab Do Bhai enforces 12 immutable financial accounting rules:
 | **10**| Additional Advance | Updates account if tracked | Increases Principal | Excluded from Income/Expense |
 | **11**| Debt Write-Off | Unchanged | Decreases Receivable / Extinguishes Debt | Recorded with explicit audit reason |
 | **12**| Reserve Money | Unchanged (Deducted from *Remaining* only)| Neutral (Earmarked within Total) | Excluded until spent |
+| **13**| Item / Bill Received on Credit | Unchanged (No fake cash inflation) | Neutral (Pure liability created) | Excluded from cash income |
+| **14**| Item / Goods Provided on Credit| Unchanged (No cash deduction) | Neutral (Pure receivable created) | Excluded from cash expense |
 
 ---
 

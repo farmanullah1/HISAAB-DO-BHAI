@@ -100,4 +100,13 @@ object Money {
         if (buffer.isEmpty() || buffer == ".") return 0L
         return parsePaisa(buffer) ?: 0L
     }
+
+    /**
+     * Converts raw paisa (Long) into a standard decimal string (e.g. 10000L -> "100", 12345L -> "123.45").
+     */
+    fun toDecimalString(paisa: Long): String {
+        val rupees = paisa / 100
+        val remainingPaisa = paisa % 100
+        return if (remainingPaisa == 0L) "$rupees" else "$rupees.${String.format(Locale.US, "%02d", remainingPaisa)}"
+    }
 }

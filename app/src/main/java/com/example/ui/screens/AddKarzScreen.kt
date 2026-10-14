@@ -75,6 +75,12 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+enum class KarzConsiderationType(val label: String, val subtitle: String) {
+    MONEY("Money (نقدی)", "Cash or bank funds"),
+    ITEM_ON_CREDIT("Item / Bill on Credit", "Groceries, food, or paid bill"),
+    NON_CASH_VALUE("Other Value", "Agreed goods or services")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddKarzScreen(
@@ -99,6 +105,7 @@ fun AddKarzScreen(
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
 
     var direction by remember { mutableStateOf(initialDirection) }
+    var considerationType by remember { mutableStateOf(KarzConsiderationType.MONEY) }
     var personName by remember { mutableStateOf("") }
     var amountInput by remember { mutableStateOf("") }
     var dateEpochMs by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -225,6 +232,92 @@ fun AddKarzScreen(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = if (!isGave) Color.White else ClayTextSecondary,
                                 fontWeight = if (!isGave) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Consideration Type Selector (Money vs Item/Food on credit vs Non-cash)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (isGave) "What are you providing to this person? *" else "What did you receive from this person? *",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ClayTextPrimary,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    KarzConsiderationType.values().forEach { type ->
+                        val isSelected = considerationType == type
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(
+                                    1.dp,
+                                    if (isSelected) ClayInkDeep else ClayBorderHairline,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    considerationType = type
+                                    if (type == KarzConsiderationType.ITEM_ON_CREDIT || type == KarzConsiderationType.NON_CASH_VALUE) {
+                                        recordCashMovement = false
+                                    } else {
+                                        recordCashMovement = true
+                                    }
+                                }
+                                .testTag("consideration_${type.name.lowercase()}"),
+                            color = if (isSelected) ClayInkDeep else MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = type.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else ClayTextPrimary,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = type.subtitle,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    color = if (isSelected) ClayAccentLime else ClayTextSecondary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (considerationType != KarzConsiderationType.MONEY) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(ClayAccentLime.copy(alpha = 0.35f))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        color = Color.Transparent
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = ClayInkDeep,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Non-cash transaction: Records payable/receivable liability without falsely altering your liquid cash balance.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ClayInkDeep
                             )
                         }
                     }
@@ -580,10 +673,17 @@ fun AddKarzScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = if (isGave)
-                            "You are recording that you gave ${Money.formatPkr(amountPaisa)} to $personName."
-                        else
-                            "You are recording that you borrowed ${Money.formatPkr(amountPaisa)} from $personName.",
+                        text = if (isGave) {
+                            if (considerationType == KarzConsiderationType.MONEY)
+                                "You are recording that you gave ${Money.formatPkr(amountPaisa)} to $personName."
+                            else
+                                "You are recording that you provided ${Money.formatPkr(amountPaisa)} worth of goods/credit to $personName."
+                        } else {
+                            if (considerationType == KarzConsiderationType.MONEY)
+                                "You are recording that you borrowed ${Money.formatPkr(amountPaisa)} from $personName."
+                            else
+                                "You are recording that you received ${Money.formatPkr(amountPaisa)} of items/bill on credit from $personName."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = ClayTextPrimary
                     )
@@ -613,7 +713,10 @@ fun AddKarzScreen(
                                 )
                             } else {
                                 Text(
-                                    text = "• Historical entry: Account balances will NOT change.\n• Only the debt tracking ledger will be updated.",
+                                    text = if (considerationType != KarzConsiderationType.MONEY)
+                                        "• Non-cash credit item: Cash Wallet balance will NOT change.\n• Pure liability/receivable ledger entry of ${Money.formatPkr(amountPaisa)}."
+                                    else
+                                        "• Historical debt: Account balances will NOT change.\n• Only the debt tracking ledger will be updated.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = ClayTextSecondary
                                 )
@@ -626,13 +729,18 @@ fun AddKarzScreen(
                 Button(
                     onClick = {
                         showReviewDialog = false
+                        val finalDesc = description.trim().ifBlank {
+                            if (considerationType == KarzConsiderationType.ITEM_ON_CREDIT) "Item/Expense on credit"
+                            else if (considerationType == KarzConsiderationType.NON_CASH_VALUE) "Non-cash value on credit"
+                            else ""
+                        }
                         onSaveDebt(
                             personName.trim(),
                             direction,
                             amountPaisa,
                             dateEpochMs,
                             if (hasDueDate) dueDateEpochMs else null,
-                            description.trim(),
+                            finalDesc,
                             phoneNumber.trim(),
                             notes.trim(),
                             if (recordCashMovement) selectedAccountId else null,

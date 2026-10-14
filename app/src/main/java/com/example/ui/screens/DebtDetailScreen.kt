@@ -108,6 +108,7 @@ fun DebtDetailScreen(
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
 
     var showRepaymentDialog by remember { mutableStateOf(false) }
+    var isFullSettlementRequested by remember { mutableStateOf(false) }
     var showAdvanceDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -332,42 +333,59 @@ fun DebtDetailScreen(
                 ) {
                     if (!isSettled && !isWrittenOff) {
                         Button(
-                            onClick = { showRepaymentDialog = true },
+                            onClick = {
+                                isFullSettlementRequested = true
+                                showRepaymentDialog = true
+                            },
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1.2f)
                                 .height(48.dp)
-                                .testTag("record_repayment_button"),
+                                .testTag("mark_paid_back_button"),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = ClayInkDeep,
                                 contentColor = Color.White
                             )
                         ) {
-                            Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = ClayAccentLime)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isGave) "Receive Repayment" else "Pay Repayment",
+                                text = if (isGave) "Receive All" else "Mark as Paid Back",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
                         OutlinedButton(
-                            onClick = { showAdvanceDialog = true },
+                            onClick = {
+                                isFullSettlementRequested = false
+                                showRepaymentDialog = true
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
-                                .testTag("record_advance_button"),
+                                .testTag("record_repayment_button"),
                             shape = RoundedCornerShape(12.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, ClayBorderHairline)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = ClayInkDeep, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.Payments, contentDescription = null, tint = ClayInkDeep, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isGave) "+ Add Advance" else "+ Borrow More",
+                                text = "Partial",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = ClayInkDeep
                             )
+                        }
+
+                        IconButton(
+                            onClick = { showAdvanceDialog = true },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
+                                .testTag("record_advance_button")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = if (isGave) "+ Add Advance" else "+ Borrow More", tint = ClayInkDeep)
                         }
                     } else {
                         Surface(
@@ -566,6 +584,7 @@ fun DebtDetailScreen(
         DebtRepaymentDialog(
             debt = debt,
             maxAmountPaisa = debtDetails.outstandingPaisa,
+            initialFullAmount = isFullSettlementRequested,
             accounts = accounts,
             onDismiss = { showRepaymentDialog = false },
             onConfirm = { amountPaisa, dateEpoch, accountId, trackCash, note ->
@@ -759,13 +778,16 @@ fun DebtRepaymentDialog(
     debt: com.example.data.model.DebtEntity,
     maxAmountPaisa: Long,
     accounts: List<AccountEntity>,
+    initialFullAmount: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (amountPaisa: Long, dateEpochMs: Long, accountId: Long?, recordCash: Boolean, note: String) -> Unit
 ) {
     val context = LocalContext.current
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
 
-    var amountInput by remember { mutableStateOf("") }
+    var amountInput by remember {
+        mutableStateOf(if (initialFullAmount) Money.toDecimalString(maxAmountPaisa) else "")
+    }
     var note by remember { mutableStateOf("") }
     var dateEpochMs by remember { mutableStateOf(System.currentTimeMillis()) }
     var recordCashMovement by remember { mutableStateOf(true) }
@@ -774,9 +796,15 @@ fun DebtRepaymentDialog(
     val amountPaisa = Money.parsePaisa(amountInput) ?: 0L
     val isValid = amountPaisa > 0L && amountPaisa <= maxAmountPaisa
 
+    val dialogTitle = if (debt.direction == DebtDirection.I_TOOK) {
+        if (initialFullAmount) "Mark as Paid Back (ادائیگی)" else "Record Partial Repayment"
+    } else {
+        if (initialFullAmount) "Mark as Received in Full (وصولی)" else "Record Partial Receipt"
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (debt.direction == DebtDirection.I_GAVE) "Record Repayment Received" else "Record Repayment Paid") },
+        title = { Text(dialogTitle) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
@@ -784,6 +812,44 @@ fun DebtRepaymentDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = ClayTextSecondary
                 )
+
+                // Quick settlement chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (amountPaisa == maxAmountPaisa) ClayInkDeep else ClaySurface)
+                            .clickable { amountInput = Money.toDecimalString(maxAmountPaisa) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Full (${Money.formatPkr(maxAmountPaisa)})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (amountPaisa == maxAmountPaisa) Color.White else ClayTextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    if (maxAmountPaisa > 10000L) {
+                        val halfPaisa = maxAmountPaisa / 2
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (amountPaisa == halfPaisa) ClayInkDeep else ClaySurface)
+                                .clickable { amountInput = Money.toDecimalString(halfPaisa) }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "50% (${Money.formatPkr(halfPaisa)})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (amountPaisa == halfPaisa) Color.White else ClayTextPrimary
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = amountInput,

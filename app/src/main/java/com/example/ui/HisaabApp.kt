@@ -35,7 +35,9 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.KarzScreen
 import com.example.ui.screens.NeedsScreen
 import com.example.ui.screens.SettingsScreen
+import androidx.compose.foundation.border
 import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayBorderHairline
 import com.example.ui.theme.ClayInkDeep
 import com.example.ui.theme.ClayTextSecondary
 import com.example.ui.viewmodel.HisaabViewModel
@@ -77,7 +79,8 @@ fun HisaabApp(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 0.dp,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                     .testTag("bottom_nav_bar")
             ) {
                 NavScreen.items.forEach { screen ->
@@ -158,7 +161,10 @@ fun HisaabApp(
                         viewModel.addReservedAmount(title, amount, null, note)
                     },
                     onToggleReserveActive = { viewModel.toggleReservedAmountActive(it) },
-                    onDeleteReserve = { viewModel.deleteReservedAmount(it) }
+                    onDeleteReserve = { viewModel.deleteReservedAmount(it) },
+                    onNavigateToDebtDetail = { debtId ->
+                        navController.navigate("debt_detail/$debtId")
+                    }
                 )
             }
 

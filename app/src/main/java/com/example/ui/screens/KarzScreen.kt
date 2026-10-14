@@ -328,7 +328,8 @@ fun KarzScreen(
                         },
                         description = "Record money you lent to someone or borrowed from someone. Every repayment and advance maintains full audit history.",
                         actionTitle = "+ I Gave Karz",
-                        onAction = onNavigateToAddGave
+                        onAction = onNavigateToAddGave,
+                        illustrationRes = if (searchQuery.isEmpty()) com.example.R.drawable.img_clay_karz_art else null
                     )
                 }
             } else {

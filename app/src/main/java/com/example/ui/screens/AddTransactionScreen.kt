@@ -225,33 +225,54 @@ fun AddTransactionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Amount Display with tight tracking
-            Text(
-                text = "AMOUNT (PKR)",
-                style = MaterialTheme.typography.labelSmall,
-                color = ClayTextSecondary,
-                letterSpacing = 1.sp
-            )
+            // Amount Display in Clay Card
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(20.dp)),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 18.dp, horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = when (selectedType) {
+                            TransactionType.EXPENSE -> "EXPENSE AMOUNT"
+                            TransactionType.INCOME -> "INCOME AMOUNT"
+                            TransactionType.TRANSFER -> "TRANSFER AMOUNT"
+                            else -> "AMOUNT (PKR)"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ClayTextSecondary,
+                        letterSpacing = 1.sp
+                    )
 
-            Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
-            val displayAmountText = if (keypadBuffer.isEmpty()) "0.00" else keypadBuffer
-            Text(
-                text = "Rs. $displayAmountText",
-                style = MaterialTheme.typography.displayMedium,
-                color = when (selectedType) {
-                    TransactionType.EXPENSE -> SemanticExpense
-                    TransactionType.INCOME -> SemanticIncome
-                    TransactionType.TRANSFER -> ClayTextPrimary
-                    else -> ClayTextPrimary
-                },
-                textAlign = TextAlign.Center,
-                modifier = Modifier.testTag("live_amount_display")
-            )
+                    val displayAmountText = if (keypadBuffer.isEmpty()) "0.00" else keypadBuffer
+                    Text(
+                        text = "Rs. $displayAmountText",
+                        style = MaterialTheme.typography.displayMedium,
+                        color = when (selectedType) {
+                            TransactionType.EXPENSE -> SemanticExpense
+                            TransactionType.INCOME -> SemanticIncome
+                            TransactionType.TRANSFER -> ClayTextPrimary
+                            else -> ClayTextPrimary
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.testTag("live_amount_display")
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Contextual Accounts Selection
             when (selectedType) {
