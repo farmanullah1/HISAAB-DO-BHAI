@@ -27,6 +27,9 @@ import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,17 +37,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.security.SecurityManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,6 +115,12 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val securityManager = remember { SecurityManager.getInstance(context) }
+    val isLockConfigured by securityManager.isLockConfigured.collectAsStateWithLifecycle()
+    val isBiometricEnabled by securityManager.isBiometricEnabled.collectAsStateWithLifecycle()
+    val isFlagSecureEnabled by securityManager.isFlagSecureEnabled.collectAsStateWithLifecycle()
+    var showSetPinDialog by remember { mutableStateOf(false) }
 
     var showAddAccountDialog by remember { mutableStateOf(false) }
     var editingAccount by remember { mutableStateOf<AccountEntity?>(null) }
@@ -372,6 +389,200 @@ fun SettingsScreen(
                 }
             }
 
+            // Biometric & Financial Vault Security Section
+            item {
+                ClaySectionCard(title = "BIOMETRIC LOCK & FINANCIAL VAULT") {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Master App Lock Toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ClaySurface)
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = ClayInkDeep,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Require Lock to Open App",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = ClayTextPrimary
+                                    )
+                                    Text(
+                                        text = "Locks app after 15s in background or on launch",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ClayTextSecondary
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isLockConfigured,
+                                onCheckedChange = { enabled ->
+                                    if (enabled && !securityManager.hasVaultPin()) {
+                                        showSetPinDialog = true
+                                    } else {
+                                        securityManager.setLockConfigured(enabled)
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = ClayInkDeep,
+                                    checkedTrackColor = ClayAccentLime,
+                                    uncheckedThumbColor = ClayTextSecondary,
+                                    uncheckedTrackColor = ClaySurface
+                                ),
+                                modifier = Modifier.testTag("app_lock_switch")
+                            )
+                        }
+
+                        // Biometric (Fingerprint/Face) Toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ClaySurface)
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = ClayInkDeep,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Enable Fingerprint Biometrics",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = ClayTextPrimary
+                                    )
+                                    Text(
+                                        text = "Fast biometric unlock with device sensor",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ClayTextSecondary
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isBiometricEnabled,
+                                onCheckedChange = { securityManager.setBiometricEnabled(it) },
+                                enabled = isLockConfigured,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = ClayInkDeep,
+                                    checkedTrackColor = ClayAccentLime
+                                ),
+                                modifier = Modifier.testTag("biometric_switch")
+                            )
+                        }
+
+                        // Change 4-digit Vault PIN Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ClaySurface)
+                                .clickable { showSetPinDialog = true }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Password,
+                                    contentDescription = null,
+                                    tint = ClayInkDeep,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Change 4-Digit Vault PIN",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = ClayTextPrimary
+                                    )
+                                    Text(
+                                        text = if (securityManager.hasVaultPin()) "Custom PIN configured" else "Default PIN: 1234",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ClayTextSecondary
+                                    )
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = { showSetPinDialog = true },
+                                modifier = Modifier.testTag("change_pin_button")
+                            ) {
+                                Text("Edit PIN", style = MaterialTheme.typography.labelSmall, color = ClayInkDeep)
+                            }
+                        }
+
+                        // Window FLAG_SECURE Toggle (Privacy Shield in Recents)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ClaySurface)
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Security,
+                                    contentDescription = null,
+                                    tint = ClayInkDeep,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Recent Apps Privacy Shield",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = ClayTextPrimary
+                                    )
+                                    Text(
+                                        text = "Blocks system screenshots in app switcher",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ClayTextSecondary
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isFlagSecureEnabled,
+                                onCheckedChange = { enabled ->
+                                    val activity = context as? android.app.Activity
+                                    securityManager.setFlagSecureEnabled(activity, enabled)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = ClayInkDeep,
+                                    checkedTrackColor = ClayAccentLime
+                                ),
+                                modifier = Modifier.testTag("flag_secure_switch")
+                            )
+                        }
+                    }
+                }
+            }
+
             // Data Export & Restore Section
             item {
                 ClaySectionCard(title = "DATA BACKUP & RESTORE") {
@@ -565,6 +776,81 @@ fun SettingsScreen(
                     } else {
                         snackbarHostState.showSnackbar("Restore error: ${result.exceptionOrNull()?.message}")
                     }
+                }
+            }
+        )
+    }
+
+    if (showSetPinDialog) {
+        var newPin by remember { mutableStateOf("") }
+        var pinError by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showSetPinDialog = false },
+            title = {
+                Text(
+                    text = "Configure 4-Digit Vault PIN",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = ClayTextPrimary
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Enter a 4-digit numeric code to unlock your private ledger if fingerprint is unavailable.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ClayTextSecondary
+                    )
+                    OutlinedTextField(
+                        value = newPin,
+                        onValueChange = {
+                            if (it.length <= 4 && it.all { c -> c.isDigit() }) {
+                                newPin = it
+                                pinError = ""
+                            }
+                        },
+                        label = { Text("4-Digit PIN") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("vault_pin_input"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ClayInkDeep,
+                            unfocusedBorderColor = ClayBorderHairline
+                        )
+                    )
+                    if (pinError.isNotEmpty()) {
+                        Text(
+                            text = pinError,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = com.example.ui.theme.SemanticExpense
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newPin.length == 4) {
+                            securityManager.setVaultPin(newPin)
+                            securityManager.setLockConfigured(true)
+                            showSetPinDialog = false
+                            Toast.makeText(context, "Vault PIN updated & lock enabled!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            pinError = "PIN must be exactly 4 digits"
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep, contentColor = Color.White),
+                    modifier = Modifier.testTag("save_pin_button")
+                ) {
+                    Text("Save PIN")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSetPinDialog = false }) {
+                    Text("Cancel", color = ClayTextSecondary)
                 }
             }
         )

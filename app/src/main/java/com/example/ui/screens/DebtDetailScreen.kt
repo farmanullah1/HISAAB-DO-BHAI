@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Share
+import com.example.ui.karz.KarzSlipPreviewDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -112,6 +114,7 @@ fun DebtDetailScreen(
     var showAdvanceDialog by remember { mutableStateOf(false) }
     var showSettleDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showSlipPreviewDialog by remember { mutableStateOf(false) }
 
     if (debtDetails == null) {
         Scaffold(
@@ -173,6 +176,16 @@ fun DebtDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showSlipPreviewDialog = true },
+                        modifier = Modifier.testTag("share_karz_top_bar_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share Slip",
+                            tint = ClayInkDeep
+                        )
+                    }
                     IconButton(
                         onClick = { showDeleteDialog = true },
                         modifier = Modifier.testTag("delete_debt_button")
@@ -406,6 +419,80 @@ fun DebtDetailScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // WhatsApp Karz Slip & PDF Statement Share Banner Card
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.5.dp, ClayBorderHairline, RoundedCornerShape(16.dp))
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = androidx.compose.material3.ripple(),
+                            onClick = { showSlipPreviewDialog = true }
+                        )
+                        .testTag("open_karz_slip_preview_card"),
+                    color = ClaySurface,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ClayInkDeep),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share",
+                                    tint = ClayAccentLime,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "WhatsApp Karz Slip & PDF Statement",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ClayInkDeep
+                                )
+                                Text(
+                                    text = "شائستہ یاد دہانی اور مکمل اسٹیٹمنٹ شیئر کریں",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ClayTextSecondary
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ClayAccentLime)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "Share",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = ClayInkDeep
+                            )
                         }
                     }
                 }
@@ -680,6 +767,13 @@ fun DebtDetailScreen(
                     Text("Cancel", color = ClayTextSecondary)
                 }
             }
+        )
+    }
+
+    if (showSlipPreviewDialog && debtDetails != null) {
+        KarzSlipPreviewDialog(
+            debtDetails = debtDetails,
+            onDismiss = { showSlipPreviewDialog = false }
         )
     }
 }

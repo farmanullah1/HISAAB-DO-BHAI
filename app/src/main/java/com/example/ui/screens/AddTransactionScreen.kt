@@ -479,7 +479,7 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Custom Numeric Keypad
+            // Custom Tactile Numeric Keypad with Quick Presets
             NumericKeypad(
                 onDigit = { digit ->
                     if (keypadBuffer == "0") {
@@ -506,6 +506,10 @@ fun AddTransactionScreen(
                     if (keypadBuffer.isNotEmpty()) {
                         keypadBuffer = keypadBuffer.dropLast(1)
                     }
+                },
+                onQuickAdd = { incrementPkr ->
+                    val cur = keypadBuffer.toDoubleOrNull() ?: 0.0
+                    keypadBuffer = (cur + incrementPkr).toInt().toString()
                 }
             )
 

@@ -25,6 +25,7 @@ import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
 import com.example.data.repository.HisaabRepository
+import com.example.ui.security.SecurityManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,7 @@ import java.io.File
 class HisaabViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = HisaabRepository.getInstance(application)
+    val securityManager = SecurityManager.getInstance(application)
 
     private var lastDeletedTransaction: TransactionEntity? = null
     private var lastDeletedNeed: NeedEntity? = null
@@ -389,6 +391,35 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.deleteDebt(debtId)
             onComplete()
+        }
+    }
+
+    fun recordQuickExpense(
+        title: String,
+        amountPaisa: Long,
+        categoryName: String,
+        onSuccess: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val accounts = activeAccounts.value
+            val defaultAccount = accounts.firstOrNull { it.name.contains("Cash", ignoreCase = true) }
+                ?: accounts.firstOrNull()
+                ?: return@launch
+
+            val categories = expenseCategories.value
+            val matchedCategory = categories.firstOrNull { it.name.contains(categoryName, ignoreCase = true) }
+                ?: categories.firstOrNull { it.name.contains("Food", ignoreCase = true) }
+                ?: categories.firstOrNull()
+                ?: return@launch
+
+            repository.recordExpense(
+                amountPaisa = amountPaisa,
+                fromAccountId = defaultAccount.id,
+                categoryId = matchedCategory.id,
+                note = title,
+                dateEpochMs = System.currentTimeMillis()
+            )
+            onSuccess("Logged ${com.example.domain.Money.formatPkr(amountPaisa)} for $title (${defaultAccount.name})")
         }
     }
 }

@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/hisaab_launcher_icon_1791804241534"
+        android:drawable="@drawable/hisaab_light_icon_1792067401138"
         android:gravity="center" />
 </layer-list>

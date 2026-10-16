@@ -40,10 +40,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -64,12 +66,19 @@ import com.example.ui.components.MonthlySummaryCard
 import com.example.ui.components.PendingRecurringCard
 import com.example.ui.components.ReservedMoneyDialog
 import com.example.ui.components.TransactionRow
+import com.example.ui.charts.ClayAnalyticsSection
+import com.example.ui.components.ExpressSpeedDialFAB
 import com.example.ui.theme.ClayAccentLime
 import com.example.ui.theme.ClayBorderHairline
 import com.example.ui.theme.ClayInkDeep
 import com.example.ui.theme.ClaySurface
 import com.example.ui.theme.ClayTextPrimary
 import com.example.ui.theme.ClayTextSecondary
+
+enum class HomeTab {
+    TRANSACTIONS,
+    ANALYTICS
+}
 
 @Composable
 fun HomeScreen(
@@ -96,6 +105,7 @@ fun HomeScreen(
     onToggleReserveActive: (ReservedAmountEntity) -> Unit = {},
     onDeleteReserve: (ReservedAmountEntity) -> Unit = {},
     onNavigateToDebtDetail: (Long) -> Unit = {},
+    onQuickLog: (title: String, amountPaisa: Long, categoryName: String) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -105,6 +115,7 @@ fun HomeScreen(
     var isSearchVisible by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<AccountEntity?>(null) }
     var showManageReservesDialog by remember { mutableStateOf(false) }
+    var currentTab by remember { mutableStateOf(HomeTab.TRANSACTIONS) }
 
     val filteredTransactions = remember(transactions, selectedAccountId, searchQuery) {
         transactions.filter { item ->
@@ -126,6 +137,24 @@ fun HomeScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            ExpressSpeedDialFAB(
+                onQuickLog = { title, amountPaisa, categoryName ->
+                    onQuickLog(title, amountPaisa, categoryName)
+                    scope.launch {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Logged ${com.example.domain.Money.formatPkr(amountPaisa)} for $title",
+                            actionLabel = "Undo",
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onUndoDelete()
+                        }
+                    }
+                }
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         LazyColumn(
@@ -277,30 +306,66 @@ fun HomeScreen(
                 }
             }
 
-            // Ledger Section Header
+            // Tab Switcher between Ledger and Visual Analytics
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(ClaySurface)
+                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = if (selectedAccountId == null) "LEDGER ENTRIES" else "FILTERED ENTRIES",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ClayTextSecondary,
-                        letterSpacing = 0.8.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (currentTab == HomeTab.TRANSACTIONS) ClayInkDeep else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable { currentTab = HomeTab.TRANSACTIONS }
+                            .padding(vertical = 8.dp)
+                            .testTag("tab_transactions"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "📑 Ledger (${filteredTransactions.size})",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (currentTab == HomeTab.TRANSACTIONS) FontWeight.Bold else FontWeight.Normal,
+                            color = if (currentTab == HomeTab.TRANSACTIONS) ClayAccentLime else ClayTextSecondary
+                        )
+                    }
 
-                    Text(
-                        text = "${filteredTransactions.size} records",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ClayTextSecondary
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (currentTab == HomeTab.ANALYTICS) ClayInkDeep else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable { currentTab = HomeTab.ANALYTICS }
+                            .padding(vertical = 8.dp)
+                            .testTag("tab_analytics"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "📊 Visual Charts & Analytics",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (currentTab == HomeTab.ANALYTICS) FontWeight.Bold else FontWeight.Normal,
+                            color = if (currentTab == HomeTab.ANALYTICS) ClayAccentLime else ClayTextSecondary
+                        )
+                    }
                 }
             }
 
-            // Empty State or Transactions List
-            if (filteredTransactions.isEmpty()) {
+            if (currentTab == HomeTab.ANALYTICS) {
+                item {
+                    ClayAnalyticsSection(
+                        transactions = transactions,
+                        monthlySummary = monthlySummary,
+                        karzSummary = karzSummary
+                    )
+                }
+            } else {
+                // Empty State or Transactions List
+                if (filteredTransactions.isEmpty()) {
                 item {
                     ClayEmptyState(
                         icon = Icons.Default.MenuBook,
@@ -338,6 +403,7 @@ fun HomeScreen(
                     )
                 }
             }
+        }
 
             item {
                 Spacer(modifier = Modifier.height(30.dp))

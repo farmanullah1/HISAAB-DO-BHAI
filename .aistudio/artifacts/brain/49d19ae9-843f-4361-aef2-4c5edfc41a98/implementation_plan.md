@@ -1,166 +1,201 @@
-# Hisaab Do Bhai (حساب دو بھائی) — Full Implementation & Polish Plan
+# Hisaab Do Bhai (حساب دو بھائی) — Functional & Visual Design Upgrade Plan
 
-A production-grade, offline-first personal finance and debt management Android application built with Kotlin, Jetpack Compose, and Room. Designed around mathematical accuracy in Pakistani Rupees (PKR), a cohesive Clay-inspired aesthetic, and full compliance with `Hisaab_Do_Bhai_Fully_Updated_Implementation_Prompt.md`.
-
----
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> The following user preferences were confirmed during Phase 1 interactive clarification:
-> - **Primary Priority:** Full end-to-end implementation across all prompt sections (accounting integrity, Karz debt/credit-item ledger, Clay Design System polish, transaction detail views, receipt capture, recurring automation, and data safety).
-> - **Navigation Hierarchy:** 5 bottom navigation tabs (`Home`, `Karz`, `Add`, `Needs`, `Settings`) for immediate discoverability of core modules.
-> - **Design Aesthetic:** Signature Clay Warm Cream canvas (`#FEFDFB`), ivory elevation layers (`#F4F3F0`, `#FFFFFF`), crisp black typography (`#000000`), and restrained Lime accents (`#EEF773` / `#CBD810`).
+A comprehensive plan to implement the prioritized functional and visual design upgrades for **Hisaab Do Bhai**, creating an offline-first, culturally authentic personal ledger and debt management experience with high-fidelity Clay styling, interactive visual analytics, and bank-grade privacy.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Executive Summary & Clarified Scope
 
-- **What It Does**: A completely private, offline personal ledger and debt tracker for individuals, freelancers, and small shop/household managers in Pakistan. Tracks cash flow, unified Cash Wallet balances, shopping needs, and informal loans/credit items (both money and physical goods/groceries/utilities received on credit) without requiring accounts, logins, or cloud access.
-- **Target Audience / Persona**: Everyday Pakistani users managing household budgets, shared family expenditures, and informal peer-to-peer credit (*Karz-e-Hasana*, shop credit, borrowed goods) who demand total privacy, zero fake data, and rock-solid balance integrity.
-- **Key Value**: Guarantees zero arithmetic discrepancies by storing all amounts in integer paisa (`Long`). Differentiates money borrowed from items/food received on credit so cash accounts are never falsely inflated.
-
----
-
-## 2. User Experience & Visual Design
-
-### Key User Flows
-
-1. **Dashboard & Balance Inspection**:
-   - User opens the app to see their **Total Balance** (liquid cash across active accounts) and **Remaining Balance** (Total Balance minus active reserved funds).
-   - Monthly summary cards breakdown verified income vs. expense, spending progress against set category budgets, and a compact Karz status card.
-   - Five most recent entries display with quick actions and explicit "View Details" access.
-
-2. **Bidirectional Karz Management (`KarzScreen` & `AddKarzScreen`)**:
-   - Dedicated tab with toggleable filters: *Active*, *Due Soon*, *Overdue*, and *Settled*.
-   - **`+ I Gave Karz`**: User records money lent, goods provided, or bills covered for another person. Explicitly prompts whether cash left Cash Wallet or is a historical/non-cash entry.
-   - **`+ I Took Karz`**: Prompts the mandatory choice:
-     1. *Money*: Borrowed cash deposited into an account (or recorded historically).
-     2. *Item or expense on credit*: Food, groceries, bill paid by another person. **Default: No cash account movement.** Outstanding liability recorded without inflating Cash Wallet.
-     3. *Other non-cash value*: Custom described good or service.
-   - **Settlement Flow**: Detail screen features contextual actions: `Mark as Paid Back` (full settlement) and `Record Partial Repayment`, asking whether money was paid from Cash Wallet, another account, or settled non-cash/waived.
-
-3. **Transaction Details & History Drilldown**:
-   - Every transaction row on Home and History contains a clear, accessible `View Details` trigger opening a comprehensive detail sheet/dialog showing exact timestamps, category, account, merchant, note, and receipt attachment.
-   - For Karz-linked events, a direct link navigates immediately to the underlying debt ledger.
-
-4. **Needs & Shopping Planner (`NeedsScreen`)**:
-   - Manage pending shopping needs with priority indicators and estimated PKR prices.
-   - Marking a need as fulfilled opens a guided transaction or Karz creation flow; never silently mutates account balances.
-
-### Visual Identity & Clay Design Tokens
+Based on the clarifying questions, this upgrade delivers a simultaneous rollout of core functional expansions and tactile visual enhancements:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        Clay Design System Palette                      │
-├────────────────────────────────────────────────────────────────────────┤
-│  Background Canvas    :  ClayBackground        (#FEFDFB)               │
-│  Secondary Surface    :  ClaySurface           (#F4F3F0)               │
-│  Card Elevation Fill  :  ClaySurfaceElevated   (#FFFFFF)               │
-│  Primary Ink          :  ClayTextPrimary       (#000000)               │
-│  Secondary Copy       :  ClayTextSecondary     (#55534E)               │
-│  Border Hairline      :  ClayBorderHairline    (#D1CDC7 - 1dp stroke)  │
-│  Active Accent        :  ClayAccentLime        (#EEF773)               │
-│  Accent Button Fill   :  ClayAccentLimeDeep    (#CBD810)               │
-│  Solid Button Ink     :  ClayInkDeep           (#1B1A18)               │
-│  Card Corner Radii    :  16.dp - 24.dp pill/squircle                   │
-└────────────────────────────────────────────────────────────────────────┘
+│                   HISAAB DO BHAI — UPGRADE MATRIX                      │
+├───────────────────────────────────┬────────────────────────────────────┤
+│       FUNCTIONAL EXPANSIONS       │      DESIGN & UX ENHANCEMENTS      │
+├───────────────────────────────────┼────────────────────────────────────┤
+│ 1. WhatsApp Karz Slips & PDF      │ 3. Interactive Clay Visual Charts  │
+│    - One-tap polite Urdu/Eng slip │    - Canvas Donut breakdown        │
+│    - PDF ledger statement export  │    - Income vs Expense bar trends  │
+│    - Direct WhatsApp share intent │    - Karz liability debt gauge     │
+│                                   │                                    │
+│ 2. Biometric Lock & Private Vault │ 4. Express Speed-Dial Widget       │
+│    - Fingerprint / Device PIN     │    - 1-tap quick log for chai/fuel │
+│    - Auto-lock on app background  │    - Customizable quick presets    │
+│    - Privacy shield in app recents│                                    │
+│                                   │ 5. Tactile Clay Keypad & Motion    │
+│                                   │    - Sculpted embossed number pad  │
+│                                   │    - Haptic feedback on tap        │
+│                                   │    - Bouncy spring physics sheets  │
+└───────────────────────────────────┴────────────────────────────────────┘
 ```
-
-- **Typography**: High-contrast, bold display numbers with tabular figure styling for monetary values. Clear distinction between primary captions and muted metadata (`sp` scaling throughout).
-- **Surface Atmosphere**: Tactile, layered cards with subtle hairlines (`1.dp` border) and soft elevation. Avoids heavy drop-shadows and garish gradients.
-- **Micro-Interactions**: M3 ripple effects on all clickable surfaces (`minimumInteractiveComponentSize(48.dp)`), animated filter chips, smooth expand/collapse accordions for debt event histories, and tactile bottom sheets.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Architecture & Component Blueprint
 
-- **Decision 1: Integer Paisa Arithmetic (`Long`)**
-  - *Approach*: All currency values are stored as `Long` paisa (1 PKR = 100 paisa) throughout the database and repository. Division/multiplication rounding errors inherent to IEEE 754 floating-point numbers are mathematically eliminated.
-  - *Trade-Off*: Requires explicit format conversions (`toPaisa()`, `toRupeesString()`), but guarantees 100% financial precision.
-
-- **Decision 2: Separation of Debt Consideration Types (Money vs. Non-Cash Goods/Bills)**
-  - *Approach*: When a user takes credit for groceries, food, or a utility bill paid by someone else, the app records an accounts-payable liability **without** adding money to Cash Wallet.
-  - *Why*: Borrowing an item or having someone buy dinner does not put cash in the user's pocket. Conflating non-cash debt with cash income creates phantom bank balances and causes real-world overdrafts.
-
-- **Decision 3: Single Unified Cash Wallet Account**
-  - *Approach*: The database initializes exactly one default liquid account named "Cash Wallet". Users can create additional accounts (e.g., "Meezan Bank", "Easypaisa") or rename Cash Wallet, but "Cash" and "Wallet" are never bifurcated into separate default accounts.
-  - *Why*: Directly aligns with user reality where physical cash in hand is a single pool of funds.
-
-- **Decision 4: Explicit Confirmation for Automation and Purchases**
-  - *Approach*: Recurring transactions and fulfilled Needs items require explicit user confirmation before recording financial ledger movements. Automated background tasks generate reminder notifications, but never silently create financial transactions without human confirmation.
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              PRESENTATION LAYER                              │
+│                                                                              │
+│  ┌───────────────────────┐  ┌──────────────────────┐  ┌───────────────────┐  │
+│  │   AnalyticsScreen     │  │  ExpressSpeedDialFAB  │  │  BiometricLockUI  │  │
+│  │  - Interactive Donut  │  │  - Quick presets      │  │  - Fingerprint    │  │
+│  │  - Bar trend graphs   │  │  - Instant 5-sec log  │  │  - PIN fallback   │  │
+│  │  - Karz ratio gauge   │  └──────────────────────┘  └───────────────────┘  │
+│  └───────────────────────┘                                                   │
+│                                                                              │
+│  ┌─────────────────────────────────┐  ┌───────────────────────────────────┐  │
+│  │    WhatsAppSlipPreviewDialog    │  │       ClayNumericKeypad           │  │
+│  │  - Urdu/English card slip       │  │  - Embossed tactile buttons       │  │
+│  │  - Share via WhatsApp Intent    │  │  - Haptic feedback integration   │  │
+│  │  - PDF Ledger export            │  │  - Fast arithmetic calculation    │  │
+│  └─────────────────────────────────┘  └───────────────────────────────────┘  │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                               VIEWMODEL LAYER                                │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────┐  ┌───────────────────┐ │
+│  │     HisaabViewModel     │  │  AnalyticsViewModel │  │ SecurityViewModel │ │
+│  │  - Fast speed log       │  │  - Monthly grouping │  │  - Lock state     │ │
+│  │  - Karz slip data prep  │  │  - Category slices  │  │  - Auth timeout   │ │
+│  └─────────────────────────┘  └─────────────────────┘  └───────────────────┘ │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           SERVICES & UTILITIES LAYER                         │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────┐  ┌───────────────────┐ │
+│  │    KarzSlipGenerator    │  │   BiometricHelper   │  │  AppPreferences   │ │
+│  │  - Android PdfDocument  │  │  - BiometricPrompt  │  │  - Biometric flag │ │
+│  │  - Bitmap slip render   │  │  - FragmentActivity │  │  - Speed presets  │ │
+│  │  - FileProvider share   │  │  - Security check   │  │  - Chart window   │ │
+│  └─────────────────────────┘  └─────────────────────┘  └───────────────────┘ │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                               DATABASE LAYER                                 │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  Room Database (HisaabDatabase)                                         │ │
+│  │  - TransactionDao, DebtDao, AccountDao, CategoryDao, BudgetDao           │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 3. Detailed Feature Breakdown
 
-### System Architecture Diagram
+### Feature 1: WhatsApp Karz Reminder Slips & PDF Statement Export
+* **Culturally Sensitive Reminder Templates**: Provide 3 distinct tones for sharing with family, friends, or customers:
+  1. *Polite / Family (Urdu & English)*: "Assalam-o-Alaikum bhai, just a gentle reminder regarding our mutual hisaab..."
+  2. *Standard Business*: "Hisaab statement as of [Date]: Outstanding balance PKR [Amount]..."
+  3. *Detailed Statement*: Full breakdown showing original amount, past repayments, and current net balance.
+* **Visual Card Slip Generator**: Renders a clean Clay-styled digital receipt slip containing:
+  - Karz direction badge ("I Gave" / "I Took")
+  - Person's name and contact
+  - Item/Consideration notes
+  - High-contrast outstanding balance
+* **One-Tap WhatsApp Share**: Direct trigger using `Intent.ACTION_SEND` targeting WhatsApp package if available, or universal chooser fallback with generated PNG/PDF attached via `FileProvider`.
+* **Full PDF Statement Export**: Multi-row A4 format ledger export using Android `PdfDocument` for archiving and printing.
+
+### Feature 2: Biometric Fingerprint Lock & Private Financial Vault
+* **Hardware Biometric & Device PIN Support**:
+  - Leverages Android `BiometricPrompt` supporting Fingerprint, Face, and Device PIN/Pattern fallback.
+  - Configurable in Settings: "Require Fingerprint to Open App".
+* **Auto-Lock Lifecycle**:
+  - Automatically locks when the app enters the background for more than 30 seconds.
+  - Seamless unlock screen with Clay styling, animated fingerprint icon, and clear biometric prompt.
+* **Privacy Mode & Window Security**:
+  - Window manager flag toggle (`FLAG_SECURE`) to prevent Android system recent apps screen from capturing sensitive financial numbers when app is in background.
+
+### Feature 3: Interactive Clay Visual Charts
+* **Custom Canvas Donut Chart**:
+  - Multi-colored category distribution with smooth arcs and Clay bevel border.
+  - Tap on any slice to expand, reveal category name, total PKR, and percentage.
+  - Center cutout displaying total monthly expense.
+* **Income vs Expense Cash Flow Bar Graph**:
+  - 6-month or 4-week bar comparison with rounded clay pill bars.
+  - Soft green (Income) vs soft terracotta (Expense) visual tokens.
+  - Tap-to-inspect bar tooltips showing exact PKR totals.
+* **Karz Liability & Net Worth Gauge**:
+  - Visual circular gauge contrasting "Receivables (I Gave)" vs "Payables (I Took)".
+  - Immediate visual assessment of debt risk and liquidity health.
+
+### Feature 4: Express Speed-Dial Widget (Fast-Log)
+* **Instant 5-Second Expense Capture**:
+  - Expandable floating action speed-dial on the Home screen.
+  - Configurable presets with popular Pakistani daily expenses:
+    * ☕ Chai / Tea (`PKR 80` / `PKR 150`)
+    * ⛽ Fuel / Petrol (`PKR 1,000` / `PKR 2,500`)
+    * 🛒 Daily Groceries / Sauda (`PKR 500` / `PKR 2,000`)
+    * 🍔 Lunch / Khana (`PKR 350` / `PKR 800`)
+* **One-Tap Save**: Instant default account deduction with haptic click confirmation and undo snackbar.
+
+### Feature 5: Tactile Clay Numeric Keypad & Micro-Animations
+* **Sculpted Embossed Keypad**:
+  - Custom full-width clay keypad for Add Transaction and Repayment screens.
+  - Tactile physical-button look with layered soft drop shadow and inner highlight.
+  - Haptic feedback vibration on every digit tap (`HapticFeedbackType.TextHandleMove`).
+* **Micro-Animations & Physics**:
+  - Spring-interpolated button depress states (`animateFloatAsState` with `spring(dampingRatio = 0.55f)`).
+  - Smooth expansion/collapse transitions for dialogs and sheets.
+
+---
+
+## 4. Implementation Phasing & File Strategy
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                               Presentation Layer                                 │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ ┌──────────┐ │
-│  │  HomeScreen  │ │  KarzScreen  │ │   AddScreen  │ │ NeedsScreen │ │ Settings │ │
-│  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └──────┬──────┘ └─────┬────┘ │
-│         │                │                │                │              │      │
-│         └────────────────┼────────────────┼────────────────┼──────────────┘      │
-│                          ▼                ▼                ▼                     │
-│                   ┌──────────────────────────────────────────────┐               │
-│                   │               HisaabViewModel                │               │
-│                   │  (StateFlow: Balances, Debts, History, Needs)│               │
-│                   └──────────────────────┬───────────────────────┘               │
-├──────────────────────────────────────────┼───────────────────────────────────────┤
-│                               Domain / Repository Layer                          │
-│                   ┌──────────────────────▼───────────────────────┐               │
-│                   │               HisaabRepository               │               │
-│                   │  - Idempotent Cash Wallet Setup              │               │
-│                   │  - Atomic Debt & Repayment Engine            │               │
-│                   │  - JSON Backup/Restore & CSV Statement       │               │
-│                   │  - Image File Store for Receipts             │               │
-│                   └──────────────────────┬───────────────────────┘               │
-├──────────────────────────────────────────┼───────────────────────────────────────┤
-│                               Persistence Layer                                  │
-│                   ┌──────────────────────▼───────────────────────┐               │
-│                   │             Room SQLite Database             │               │
-│                   │  ┌──────────────┐ ┌────────────────────────┐ │               │
-│                   │  │   accounts   │ │      transactions      │ │               │
-│                   │  ├──────────────┤ ├────────────────────────┤ │               │
-│                   │  │    debts     │ │      debt_events       │ │               │
-│                   │  ├──────────────┤ ├────────────────────────┤ │               │
-│                   │  │    needs     │ │   recurring_rules      │ │               │
-│                   │  └──────────────┘ └────────────────────────┘ │               │
-│                   └──────────────────────────────────────────────┘               │
-└──────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ IMPLEMENTATION PHASES                                                        │
+├─────────┬────────────────────────────────────────────────────────────────────┤
+│ Phase 1 │ Core Utilities & Security Foundation                               │
+│         │ - BiometricHelper & SecurityViewModel                              │
+│         │ - KarzSlipGenerator (Bitmap & PDF export + FileProvider setup)     │
+│         │ - SharedPreferences / DataStore settings expansion                 │
+├─────────┼────────────────────────────────────────────────────────────────────┤
+│ Phase 2 │ Interactive Visual Charts & Analytics Screen                       │
+│         │ - ClayDonutChart & ClayBarChart Composables                        │
+│         │ - KarzLiabilityGauge Composable                                    │
+│         │ - AnalyticsScreen & navigation route integration                   │
+├─────────┼────────────────────────────────────────────────────────────────────┤
+│ Phase 3 │ WhatsApp Karz Slip Sharing & Slip Preview Dialog                   │
+│         │ - KarzSlipPreviewDialog in DebtDetailScreen                        │
+│         │ - Urdu/English reminder text generator with WhatsApp launch        │
+│         │ - PDF ledger statement download action                             │
+├─────────┼────────────────────────────────────────────────────────────────────┤
+│ Phase 4 │ Express Speed-Dial & Tactile Keypad                                │
+│         │ - ExpressSpeedDialFAB component on HomeScreen                      │
+│         │ - ClayNumericKeypad with haptic feedback & spring motion           │
+│         │ - Quick-log integration into HisaabViewModel                       │
+├─────────┼────────────────────────────────────────────────────────────────────┤
+│ Phase 5 │ Verification, Build Check & Polish                                 │
+│         │ - Compile verification via compile_applet                          │
+│         │ - End-to-end testing of gestures, dialogs, and sharing intents     │
+└─────────┴────────────────────────────────────────────────────────────────────┘
 ```
 
-### Core Entities & Database Schema
+---
 
-1. **`accounts`**: `id`, `name`, `type`, `colorHex`, `iconName`, `openingBalancePaisa`, `isArchived`, `createdAt`, `updatedAt`. Default seeded: single `Cash Wallet`.
-2. **`transactions`**: `id`, `type` (`EXPENSE`, `INCOME`, `TRANSFER`), `amountPaisa`, `accountId`, `toAccountId`, `categoryId`, `description`, `note`, `receiptPath`, `timestampEpochMs`, `linkedDebtId`, `linkedDebtEventId`.
-3. **`debts`**: `id`, `direction` (`GAVE`, `TOOK`), `considerationType` (`MONEY`, `ITEM_GOODS`, `BILL_EXPENSE`, `OTHER_NON_CASH`), `personName`, `itemDescription`, `originalPrincipalPaisa`, `dueDateEpochMs`, `status` (`ACTIVE`, `PARTIALLY_PAID`, `SETTLED`, `WRITTEN_OFF`), `accountId`, `notes`, `receiptPath`, `createdAtEpochMs`.
-4. **`debt_events`**: `id`, `debtId`, `eventType` (`ADVANCE`, `REPAYMENT`, `CORRECTION`, `FORGIVENESS`), `amountPaisa`, `timestampEpochMs`, `settlementType` (`CASH_WALLET`, `OTHER_ACCOUNT`, `NON_CASH_SETTLED`, `WAIVED`), `accountId`, `note`, `receiptPath`.
-5. **`needs`**: `id`, `name`, `estimatedPricePaisa`, `priority`, `category`, `isDone`, `doneAtEpochMs`, `targetDateEpochMs`.
-6. **`recurring_rules`**: `id`, `title`, `amountPaisa`, `type`, `categoryId`, `accountId`, `frequency`, `nextDueEpochMs`, `isPaused`.
+## 5. Verification & Acceptance Criteria
 
-### Implementation Sequence
-
-1. **Audit & Navigation Alignment**:
-   - Verify `NavScreen.kt` and `HisaabApp.kt` bottom navigation bar correctly binds all 5 destinations (`Home`, `Karz`, `Add`, `Needs`, `Settings`) with proper insets (`navigationBarsPadding()`), active lime pill styling, and back navigation.
-2. **Transaction Entry & Explicit View Details**:
-   - Ensure `TransactionRow` and transaction lists across `HomeScreen` and History offer an explicit, discoverable `View Details` modal/dialog with full record introspection, receipt zoom, edit, and safe delete.
-   - For transactions linked to debts (`linkedDebtId`), link directly to the target debt record.
-3. **Karz Ledger & Non-Cash Debt Fidelity**:
-   - Confirm `AddKarzScreen` prominently presents the three consideration types for `I Took Karz` with explanatory cards and icons.
-   - Guarantee non-cash debts leave Cash Wallet unchanged at creation.
-   - Confirm `DebtDetailScreen` enables `Mark as Paid Back`, `Record Partial Repayment`, and detailed chronological event tracking.
-4. **Receipt Capture & Local Image Storage**:
-   - Verify zero-permission Android Photo Picker (`ActivityResultContracts.PickVisualMedia`) and Camera flows save images locally into app-private internal storage, with zoomable previews and safe cleanup.
-5. **Recurring Automation & Notification Permission**:
-   - Confirm pending recurring items show review cards on `HomeScreen` requiring user tap to confirm or skip.
-   - Handle Android 13+ `POST_NOTIFICATIONS` runtime permission with informative rationale dialog.
-6. **Data Safety, Backup, & Export**:
-   - Verify JSON backup/restore preserves all accounts, transactions, debts, events, and needs.
-   - Confirm person-specific Karz statement export generates clean, human-readable summary text and CSV files via Android Sharesheet.
-7. **Verification & Testing**:
-   - Run `gradle :app:testDebugUnitTest` to verify all 35+ Robolectric and unit tests pass without errors.
-   - Run `compile_applet` to guarantee a clean build.
+1. **WhatsApp & PDF Slips**:
+   - Tapping "Share Slip via WhatsApp" opens the preview dialog with formatted Urdu/English reminder text and card slip.
+   - Sharing launches WhatsApp with pre-filled message or share sheet.
+   - PDF export produces a valid, readable statement document in app cache.
+2. **Biometric Security**:
+   - Enabling biometric lock in Settings prompts for fingerprint/PIN.
+   - App locks on return from background when enabled, presenting the Clay lock shield.
+3. **Interactive Charts**:
+   - Donut and bar charts render cleanly without lag. Slices respond to touch with expand animation and tooltip update.
+4. **Speed Dial**:
+   - Tapping quick preset logs transaction immediately to default account and displays confirmation.
+5. **Keypad & Haptics**:
+   - Digits respond with tactile depression and haptic feedback.
+6. **Compilation**:
+   - `compile_applet` succeeds with 0 errors.

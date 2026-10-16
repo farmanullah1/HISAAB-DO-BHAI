@@ -36,6 +36,7 @@ import com.example.ui.screens.KarzScreen
 import com.example.ui.screens.NeedsScreen
 import com.example.ui.screens.SettingsScreen
 import androidx.compose.foundation.border
+import com.example.ui.security.BiometricLockScreen
 import com.example.ui.theme.ClayAccentLime
 import com.example.ui.theme.ClayBorderHairline
 import com.example.ui.theme.ClayInkDeep
@@ -69,8 +70,15 @@ fun HisaabApp(
     val debts by viewModel.debts.collectAsStateWithLifecycle()
     val karzSummary by viewModel.karzSummary.collectAsStateWithLifecycle()
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
+    val isLocked by viewModel.securityManager.isLocked.collectAsStateWithLifecycle()
 
-    Scaffold(
+    if (isLocked) {
+        BiometricLockScreen(
+            securityManager = viewModel.securityManager,
+            onUnlocked = { viewModel.securityManager.unlock() }
+        )
+    } else {
+        Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
@@ -164,6 +172,9 @@ fun HisaabApp(
                     onDeleteReserve = { viewModel.deleteReservedAmount(it) },
                     onNavigateToDebtDetail = { debtId ->
                         navController.navigate("debt_detail/$debtId")
+                    },
+                    onQuickLog = { title, amountPaisa, categoryName ->
+                        viewModel.recordQuickExpense(title, amountPaisa, categoryName)
                     }
                 )
             }
@@ -293,4 +304,5 @@ fun HisaabApp(
             }
         }
     }
+}
 }
