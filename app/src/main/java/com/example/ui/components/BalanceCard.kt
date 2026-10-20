@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,6 +32,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.money.PkrFormatter
 import com.example.data.model.AccountEntity
 import com.example.data.model.AccountWithBalance
 import com.example.domain.Money
@@ -98,24 +103,29 @@ fun BalanceCard(
                     )
                     IconButton(
                         onClick = { showInfoDialog = true },
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(36.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Balance explanation",
                             tint = ClayTextSecondary,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                     IconButton(
                         onClick = onTogglePrivacy,
-                        modifier = Modifier.size(26.dp).testTag("toggle_privacy_button")
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(36.dp)
+                            .testTag("toggle_privacy_button")
                     ) {
                         Icon(
                             imageVector = if (privacyMode) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = if (privacyMode) "Reveal balances" else "Hide balances",
                             tint = ClayTextSecondary,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -146,7 +156,7 @@ fun BalanceCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             // Display Total Balance
-            val totalDisplay = if (privacyMode) "Rs. ••••••" else Money.formatPkr(totalBalancePaisa)
+            val totalDisplay = if (privacyMode) "₨ ••••••" else PkrFormatter.format(totalBalancePaisa)
             Text(
                 text = totalDisplay,
                 style = MaterialTheme.typography.displayLarge,
@@ -158,7 +168,7 @@ fun BalanceCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Remaining Balance Banner (Total - Reserved)
-            val remainingDisplay = if (privacyMode) "Rs. ••••••" else Money.formatPkr(remainingBalancePaisa)
+            val remainingDisplay = if (privacyMode) "₨ ••••••" else PkrFormatter.format(remainingBalancePaisa)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,7 +205,7 @@ fun BalanceCard(
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
                             Text(
-                                text = if (privacyMode) "Reserved" else "${Money.formatPkr(reservedPaisa)} Reserved",
+                                text = if (privacyMode) "Reserved" else "${PkrFormatter.format(reservedPaisa)} Reserved",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ClayInkDeep
                             )
@@ -222,8 +232,11 @@ fun BalanceCard(
 
             // Filter Chips (Pill shaped: All, Cash Wallet, and other user accounts)
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 val isAllSelected = selectedAccountId == null
                 Box(
@@ -236,12 +249,13 @@ fun BalanceCard(
                             shape = RoundedCornerShape(9999.dp)
                         )
                         .clickable { onAccountSelected(null) }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
                         .testTag("filter_all_accounts")
                 ) {
                     Text(
                         text = "All",
                         style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
                         color = ClayInkDeep
                     )
                 }
@@ -262,20 +276,21 @@ fun BalanceCard(
                                 shape = RoundedCornerShape(9999.dp)
                             )
                             .clickable { onAccountSelected(if (isSelected) null else accWithBal.account.id) }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
                             .testTag("filter_account_${accWithBal.account.id}"),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(accountColor)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = accWithBal.account.name,
+                            text = if (privacyMode) accWithBal.account.name else "${accWithBal.account.name} · ${PkrFormatter.format(accWithBal.currentBalancePaisa)}",
                             style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = ClayInkDeep
                         )
                     }

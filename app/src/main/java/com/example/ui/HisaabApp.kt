@@ -4,7 +4,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -14,8 +21,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -218,11 +227,20 @@ fun HisaabApp(
                 val debtId = backStackEntry.arguments?.getString("debtId")?.toLongOrNull() ?: 0L
                 val debtDetailsFlow = remember(debtId) { viewModel.getDebtDetails(debtId) }
                 val debtDetails by debtDetailsFlow.collectAsStateWithLifecycle(initialValue = null)
+                val installmentsFlow = remember(debtId) { viewModel.getInstallmentsForDebt(debtId) }
+                val installments by installmentsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
                 DebtDetailScreen(
                     debtDetails = debtDetails,
                     accounts = activeAccounts,
                     privacyMode = privacyMode,
+                    installments = installments,
+                    onSplitInstallments = { id, count, isWeekly, firstDue ->
+                        viewModel.splitDebtIntoInstallments(id, count, isWeekly, firstDue)
+                    },
+                    onPayInstallment = { inst, amount, accId, trackCash, note ->
+                        viewModel.recordKarzInstallmentPayment(inst, amount, accId, trackCash, System.currentTimeMillis(), note)
+                    },
                     onRecordRepayment = { id, amount, date, accId, trackCash, note ->
                         viewModel.recordDebtRepayment(id, amount, date, accId, trackCash, note)
                     },

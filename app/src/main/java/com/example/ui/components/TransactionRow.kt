@@ -3,12 +3,14 @@ package com.example.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +26,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,8 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
 import com.example.domain.Money
@@ -60,7 +66,7 @@ fun TransactionRow(
     onNavigateToDebtDetail: ((Long) -> Unit)? = null
 ) {
     val tx = item.transaction
-    val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
+    val dateFormatter = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.US) }
     val formattedDate = dateFormatter.format(Date(tx.dateEpochMs))
 
     var showDetailDialog by remember { mutableStateOf(false) }
@@ -119,12 +125,16 @@ fun TransactionRow(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp))
-            .clickable { showDetailDialog = true }
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(),
+                onClick = { showDetailDialog = true }
+            )
             .testTag("transaction_row_${tx.id}"),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier
@@ -156,14 +166,14 @@ fun TransactionRow(
                         imageVector = Icons.Default.Handshake,
                         contentDescription = "Karz",
                         tint = amountColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 } else {
                     Icon(
                         imageVector = CategoryIconHelper.getIcon(item.categoryIconKey),
                         contentDescription = title,
                         tint = amountColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -178,6 +188,7 @@ fun TransactionRow(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = ClayTextPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -209,6 +220,8 @@ fun TransactionRow(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -218,18 +231,21 @@ fun TransactionRow(
                 )
 
                 if (tx.note.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = tx.note,
                         style = MaterialTheme.typography.labelSmall,
-                        color = ClayTextSecondary.copy(alpha = 0.8f),
+                        color = ClayTextSecondary.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.sp,
                     color = ClayTextSecondary.copy(alpha = 0.6f)
                 )
             }
@@ -242,21 +258,23 @@ fun TransactionRow(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = if (privacyMode) "••••••" else Money.formatSigned(tx.amountPaisa, tx.type),
-                    style = MaterialTheme.typography.titleLarge,
+                    text = if (privacyMode) "₨ ••••••" else Money.formatSigned(tx.amountPaisa, tx.type),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = amountColor
                 )
 
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier
+                        .minimumInteractiveComponentSize()
                         .size(36.dp)
                         .testTag("delete_transaction_${tx.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = "Delete transaction",
-                        tint = ClayTextSecondary,
+                        tint = ClayTextSecondary.copy(alpha = 0.7f),
                         modifier = Modifier.size(18.dp)
                     )
                 }

@@ -92,6 +92,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+import com.example.core.money.InstallmentSplitter
+import com.example.core.money.PkrFormatter
+import com.example.data.model.InstallmentStatus
+import com.example.data.model.KarzInstallmentEntity
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebtDetailScreen(
@@ -104,6 +109,9 @@ fun DebtDetailScreen(
     onChangeDueDate: (debtId: Long, newDueDateEpochMs: Long?) -> Unit,
     onDeleteDebt: (debtId: Long) -> Unit,
     onNavigateBack: () -> Unit,
+    installments: List<KarzInstallmentEntity> = emptyList(),
+    onSplitInstallments: ((debtId: Long, count: Int, isWeekly: Boolean, firstDueDateEpochDay: Long) -> Unit)? = null,
+    onPayInstallment: ((installment: KarzInstallmentEntity, amountPaisa: Long, accountId: Long?, trackCash: Boolean, note: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -115,6 +123,8 @@ fun DebtDetailScreen(
     var showSettleDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showSlipPreviewDialog by remember { mutableStateOf(false) }
+    var showSplitInstallmentDialog by remember { mutableStateOf(false) }
+    var payingInstallment by remember { mutableStateOf<KarzInstallmentEntity?>(null) }
 
     if (debtDetails == null) {
         Scaffold(
@@ -418,6 +428,132 @@ fun DebtDetailScreen(
                                     color = SemanticIncome,
                                     fontWeight = FontWeight.SemiBold
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Installment Plan & Schedule Card
+            if (debt.kind == com.example.data.model.DebtKind.MONEY && !isSettled) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(16.dp)),
+                        color = ClaySurface,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = ClayInkDeep,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Installment Plan (اقساط)",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ClayTextPrimary
+                                    )
+                                }
+
+                                if (installments.isEmpty()) {
+                                    Button(
+                                        onClick = { showSplitInstallmentDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text("Split (تقسیم کریں)", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+
+                            if (installments.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "${installments.count { it.status == InstallmentStatus.PAID }} of ${installments.size} Paid · Total ${PkrFormatter.format(debtDetails.outstandingPaisa)} remaining",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ClayTextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                installments.forEach { inst ->
+                                    val isPaid = inst.status == InstallmentStatus.PAID
+                                    val dateText = remember(inst.dueDateEpochDay) {
+                                        java.time.LocalDate.ofEpochDay(inst.dueDateEpochDay).format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                                    }
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, ClayBorderHairline)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = "Installment ${inst.number} of ${inst.totalCount}",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = ClayTextPrimary
+                                                )
+                                                Text(
+                                                    text = "Due: $dateText",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = ClayTextSecondary
+                                                )
+                                            }
+
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = if (privacyMode) "₨ •••••" else PkrFormatter.format(inst.scheduledPaisa),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = ClayTextPrimary
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                if (!isPaid) {
+                                                    Button(
+                                                        onClick = { payingInstallment = inst },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(30.dp)
+                                                    ) {
+                                                        Text("Pay", fontSize = 11.sp)
+                                                    }
+                                                } else {
+                                                    Surface(
+                                                        color = SemanticIncome.copy(alpha = 0.15f),
+                                                        shape = RoundedCornerShape(6.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "PAID",
+                                                            color = SemanticIncome,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -765,6 +901,177 @@ fun DebtDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel", color = ClayTextSecondary)
+                }
+            }
+        )
+    }
+
+    if (showSplitInstallmentDialog && debtDetails != null) {
+        var countText by remember { mutableStateOf("3") }
+        var isWeekly by remember { mutableStateOf(false) }
+        val count = countText.toIntOrNull() ?: 3
+        val previewAmounts = remember(count, debtDetails.outstandingPaisa) {
+            if (count in 2..120 && debtDetails.outstandingPaisa > 0L) {
+                InstallmentSplitter.split(debtDetails.outstandingPaisa, count)
+            } else emptyList()
+        }
+
+        AlertDialog(
+            onDismissRequest = { showSplitInstallmentDialog = false },
+            title = { Text("Split into Installments (اقساط)") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Divide outstanding balance of ${PkrFormatter.format(debtDetails.outstandingPaisa)} into scheduled installments.")
+                    OutlinedTextField(
+                        value = countText,
+                        onValueChange = { countText = it },
+                        label = { Text("Number of Installments (2-120)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(10.dp))
+                            .padding(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (!isWeekly) ClayInkDeep else Color.Transparent)
+                                .clickable { isWeekly = false }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Monthly",
+                                color = if (!isWeekly) Color.White else ClayTextSecondary,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (!isWeekly) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isWeekly) ClayInkDeep else Color.Transparent)
+                                .clickable { isWeekly = true }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Weekly",
+                                color = if (isWeekly) Color.White else ClayTextSecondary,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isWeekly) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+
+                    if (previewAmounts.isNotEmpty()) {
+                        Text(
+                            "Preview Schedule (${previewAmounts.size} parts):",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ClayTextSecondary
+                        )
+                        previewAmounts.take(3).forEachIndexed { idx, amt ->
+                            Text(
+                                "• Part ${idx + 1}: ${PkrFormatter.format(amt)}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (previewAmounts.size > 3) {
+                            Text("... and ${previewAmounts.size - 3} more", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (count in 2..120) {
+                            onSplitInstallments?.invoke(
+                                debt.id,
+                                count,
+                                isWeekly,
+                                java.time.LocalDate.now().plusDays(if (isWeekly) 7L else 30L).toEpochDay()
+                            )
+                            showSplitInstallmentDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                ) {
+                    Text("Confirm Schedule")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSplitInstallmentDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (payingInstallment != null) {
+        val inst = payingInstallment!!
+        var selectedAccId by remember { mutableStateOf(accounts.firstOrNull()?.id) }
+        var recordCash by remember { mutableStateOf(true) }
+        var note by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { payingInstallment = null },
+            title = { Text("Pay Installment ${inst.number}/${inst.totalCount}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Amount due: ${PkrFormatter.format(inst.scheduledPaisa - inst.paidPaisa)}")
+                    if (accounts.isNotEmpty()) {
+                        Text("Account:", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
+                        accounts.forEach { acc ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedAccId = acc.id }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (acc.id == selectedAccId) "●  ${acc.name}" else "○  ${acc.name}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text("Payment Note (Optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onPayInstallment?.invoke(
+                            inst,
+                            inst.scheduledPaisa - inst.paidPaisa,
+                            selectedAccId,
+                            recordCash,
+                            note
+                        )
+                        payingInstallment = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                ) {
+                    Text("Record Payment")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { payingInstallment = null }) {
+                    Text("Cancel")
                 }
             }
         )
