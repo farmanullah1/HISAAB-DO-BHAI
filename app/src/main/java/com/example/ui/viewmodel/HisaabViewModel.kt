@@ -24,6 +24,15 @@ import com.example.data.model.ReservedAmountEntity
 import com.example.data.model.TransactionEntity
 import com.example.data.model.TransactionItem
 import com.example.data.model.TransactionType
+import com.example.data.model.CategoryBudgetEntity
+import com.example.data.model.CharityCategory
+import com.example.data.model.CharityRecordEntity
+import com.example.data.model.KametiCadence
+import com.example.data.model.KametiContributionEntity
+import com.example.data.model.KametiEntity
+import com.example.data.model.KametiPayoutEntity
+import com.example.data.model.KarzInstallmentEntity
+import com.example.data.model.ZakatCalculationEntity
 import com.example.data.repository.HisaabRepository
 import com.example.ui.security.SecurityManager
 import kotlinx.coroutines.flow.Flow
@@ -297,6 +306,11 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
         notes: String = "",
         accountId: Long? = null,
         recordCashMovement: Boolean = false,
+        kind: com.example.data.model.DebtKind = com.example.data.model.DebtKind.MONEY,
+        itemDescription: String = "",
+        itemQuantity: Double? = null,
+        itemUnit: String = "",
+        estimatedValuePaisa: Long? = null,
         onSuccess: (Long) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -310,7 +324,12 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
                 phoneNumber = phoneNumber,
                 notes = notes,
                 accountId = accountId,
-                recordCashMovement = recordCashMovement
+                recordCashMovement = recordCashMovement,
+                kind = kind,
+                itemDescription = itemDescription,
+                itemQuantity = itemQuantity,
+                itemUnit = itemUnit,
+                estimatedValuePaisa = estimatedValuePaisa
             )
             onSuccess(debtId)
         }
@@ -420,6 +439,187 @@ class HisaabViewModel(application: Application) : AndroidViewModel(application) 
                 dateEpochMs = System.currentTimeMillis()
             )
             onSuccess("Logged ${com.example.domain.Money.formatPkr(amountPaisa)} for $title (${defaultAccount.name})")
+        }
+    }
+
+    // --- Karz Installments ---
+    fun getInstallmentsForDebt(debtId: Long): Flow<List<KarzInstallmentEntity>> =
+        repository.getInstallmentsForDebtFlow(debtId)
+
+    fun splitDebtIntoInstallments(
+        debtId: Long,
+        count: Int,
+        isWeekly: Boolean,
+        firstDueDateEpochDay: Long,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.splitDebtIntoInstallments(debtId, count, isWeekly, firstDueDateEpochDay)
+            onComplete()
+        }
+    }
+
+    fun recordKarzInstallmentPayment(
+        installment: KarzInstallmentEntity,
+        amountPaisa: Long,
+        accountId: Long?,
+        recordCashMovement: Boolean,
+        dateEpochMs: Long,
+        note: String,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.recordKarzInstallmentPayment(
+                installment = installment,
+                amountPaisa = amountPaisa,
+                accountId = accountId,
+                recordCashMovement = recordCashMovement,
+                dateEpochMs = dateEpochMs,
+                note = note
+            )
+            onComplete()
+        }
+    }
+
+    fun rescheduleInstallment(
+        installment: KarzInstallmentEntity,
+        newDueDateEpochDay: Long,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.rescheduleInstallment(installment, newDueDateEpochDay)
+            onComplete()
+        }
+    }
+
+    // --- Kameti (Committee Savings) ---
+    val allKametis: StateFlow<List<KametiEntity>> = repository.getAllKametisFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun getContributionsForKameti(kametiId: Long): Flow<List<KametiContributionEntity>> =
+        repository.getContributionsForKametiFlow(kametiId)
+
+    fun getPayoutForKameti(kametiId: Long): Flow<KametiPayoutEntity?> =
+        repository.getPayoutForKametiFlow(kametiId)
+
+    fun createKameti(
+        name: String,
+        memberCount: Int,
+        contributionPaisa: Long,
+        cadence: KametiCadence,
+        startDateEpochDay: Long,
+        totalInstallments: Int,
+        myPayoutInstallment: Int,
+        expectedPayoutPaisa: Long?,
+        note: String,
+        onComplete: (Long) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val id = repository.createKameti(
+                name = name,
+                memberCount = memberCount,
+                contributionPaisa = contributionPaisa,
+                cadence = cadence,
+                startDateEpochDay = startDateEpochDay,
+                totalInstallments = totalInstallments,
+                myPayoutInstallment = myPayoutInstallment,
+                expectedPayoutPaisa = expectedPayoutPaisa,
+                note = note
+            )
+            onComplete(id)
+        }
+    }
+
+    fun recordKametiContribution(
+        contributionId: Long,
+        accountId: Long,
+        amountPaisa: Long,
+        dateEpochDay: Long,
+        note: String,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.recordKametiContribution(contributionId, accountId, amountPaisa, dateEpochDay, note)
+            onComplete()
+        }
+    }
+
+    fun claimKametiPayout(
+        payoutId: Long,
+        kametiId: Long,
+        accountId: Long,
+        receivedAmountPaisa: Long,
+        dateEpochDay: Long,
+        note: String,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.claimKametiPayout(payoutId, kametiId, accountId, receivedAmountPaisa, dateEpochDay, note)
+            onComplete()
+        }
+    }
+
+    fun archiveKameti(kametiId: Long, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.archiveKameti(kametiId)
+            onComplete()
+        }
+    }
+
+    // --- Zakat & Charity ---
+    val charityRecords: StateFlow<List<CharityRecordEntity>> = repository.getAllCharityRecordsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val zakatCalculations: StateFlow<List<ZakatCalculationEntity>> = repository.getAllZakatCalculationsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun saveZakatCalculation(
+        calculation: ZakatCalculationEntity,
+        onComplete: (Long) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val id = repository.saveZakatCalculation(calculation)
+            onComplete(id)
+        }
+    }
+
+    fun recordCharityPayment(
+        category: CharityCategory,
+        recipientName: String,
+        amountPaisa: Long,
+        dateEpochDay: Long,
+        accountId: Long?,
+        recordCashMovement: Boolean,
+        note: String,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.recordCharityPayment(
+                category = category,
+                recipientName = recipientName,
+                amountPaisa = amountPaisa,
+                dateEpochDay = dateEpochDay,
+                accountId = accountId,
+                recordCashMovement = recordCashMovement,
+                note = note
+            )
+            onComplete()
+        }
+    }
+
+    // --- Category Budgets ---
+    val categoryBudgets: StateFlow<List<CategoryBudgetEntity>> = repository.getAllCategoryBudgetsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun saveCategoryBudget(
+        categoryId: Long,
+        monthKey: String,
+        limitPaisa: Long,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repository.saveCategoryBudget(categoryId, monthKey, limitPaisa)
+            onComplete()
         }
     }
 }

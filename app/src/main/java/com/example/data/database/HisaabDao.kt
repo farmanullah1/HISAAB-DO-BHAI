@@ -319,4 +319,108 @@ interface HisaabDao {
 
     @Query("SELECT COUNT(*) FROM recurring_rules")
     suspend fun getRecurringRulesCount(): Int
+
+    // --- Kameti (Committee) ---
+    @Query("SELECT * FROM kameti WHERE archived = 0 ORDER BY id DESC")
+    fun getActiveKametisFlow(): Flow<List<com.example.data.model.KametiEntity>>
+
+    @Query("SELECT * FROM kameti ORDER BY id DESC")
+    fun getAllKametisFlow(): Flow<List<com.example.data.model.KametiEntity>>
+
+    @Query("SELECT * FROM kameti WHERE id = :id")
+    suspend fun getKametiById(id: Long): com.example.data.model.KametiEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertKameti(kameti: com.example.data.model.KametiEntity): Long
+
+    @Update
+    suspend fun updateKameti(kameti: com.example.data.model.KametiEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContributions(contributions: List<com.example.data.model.KametiContributionEntity>)
+
+    @Query("SELECT * FROM kameti_contribution WHERE kametiId = :kametiId ORDER BY installmentIndex ASC")
+    fun getContributionsForKametiFlow(kametiId: Long): Flow<List<com.example.data.model.KametiContributionEntity>>
+
+    @Query("SELECT * FROM kameti_contribution WHERE id = :id")
+    suspend fun getContributionById(id: Long): com.example.data.model.KametiContributionEntity?
+
+    @Update
+    suspend fun updateContribution(contribution: com.example.data.model.KametiContributionEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPayout(payout: com.example.data.model.KametiPayoutEntity): Long
+
+    @Query("SELECT * FROM kameti_payout WHERE kametiId = :kametiId LIMIT 1")
+    fun getPayoutForKametiFlow(kametiId: Long): Flow<com.example.data.model.KametiPayoutEntity?>
+
+    @Query("SELECT * FROM kameti_payout WHERE kametiId = :kametiId LIMIT 1")
+    suspend fun getPayoutForKameti(kametiId: Long): com.example.data.model.KametiPayoutEntity?
+
+    @Update
+    suspend fun updatePayout(payout: com.example.data.model.KametiPayoutEntity)
+
+    // --- Karz Installments ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInstallments(installments: List<com.example.data.model.KarzInstallmentEntity>)
+
+    @Query("SELECT * FROM karz_installment WHERE debtId = :debtId ORDER BY number ASC")
+    fun getInstallmentsForDebtFlow(debtId: Long): Flow<List<com.example.data.model.KarzInstallmentEntity>>
+
+    @Query("SELECT * FROM karz_installment WHERE dueDateEpochDay BETWEEN :startEpochDay AND :endEpochDay ORDER BY dueDateEpochDay ASC")
+    fun getInstallmentsDueBetweenFlow(startEpochDay: Long, endEpochDay: Long): Flow<List<com.example.data.model.KarzInstallmentEntity>>
+
+    @Update
+    suspend fun updateInstallment(installment: com.example.data.model.KarzInstallmentEntity)
+
+    // --- Charity & Zakat ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCharityRecord(record: com.example.data.model.CharityRecordEntity): Long
+
+    @Query("SELECT * FROM charity_record ORDER BY id DESC")
+    fun getAllCharityRecordsFlow(): Flow<List<com.example.data.model.CharityRecordEntity>>
+
+    @Update
+    suspend fun updateCharityRecord(record: com.example.data.model.CharityRecordEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertZakatCalculation(calculation: com.example.data.model.ZakatCalculationEntity): Long
+
+    @Query("SELECT * FROM zakat_calculation ORDER BY createdAtEpochMs DESC")
+    fun getAllZakatCalculationsFlow(): Flow<List<com.example.data.model.ZakatCalculationEntity>>
+
+    // --- Category Budgets ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategoryBudget(budget: com.example.data.model.CategoryBudgetEntity): Long
+
+    @Query("SELECT * FROM category_budget ORDER BY id ASC")
+    fun getAllCategoryBudgetsFlow(): Flow<List<com.example.data.model.CategoryBudgetEntity>>
+
+    @Query("SELECT * FROM category_budget WHERE categoryId = :categoryId AND (monthKey = :monthKey OR monthKey = '*') LIMIT 1")
+    suspend fun getBudgetForCategory(categoryId: Long, monthKey: String): com.example.data.model.CategoryBudgetEntity?
+
+    // --- Audit Log ---
+    @Insert
+    suspend fun insertAuditLog(log: com.example.data.model.AuditLogEntity): Long
+
+    @Query("SELECT * FROM audit_log ORDER BY createdAtEpochMs DESC LIMIT :limit")
+    fun getRecentAuditLogsFlow(limit: Int = 100): Flow<List<com.example.data.model.AuditLogEntity>>
+
+    // --- User Reminders ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReminder(reminder: com.example.data.model.UserReminderEntity): Long
+
+    @Query("SELECT * FROM user_reminder WHERE dateEpochDay BETWEEN :startEpochDay AND :endEpochDay ORDER BY dateEpochDay ASC")
+    fun getRemindersDueBetweenFlow(startEpochDay: Long, endEpochDay: Long): Flow<List<com.example.data.model.UserReminderEntity>>
+
+    @Update
+    suspend fun updateReminder(reminder: com.example.data.model.UserReminderEntity)
+
+    // --- Import Fingerprints ---
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertFingerprint(fp: com.example.data.model.ImportFingerprintEntity): Long
+
+    @Query("SELECT COUNT(*) > 0 FROM import_fingerprint WHERE fingerprint = :fingerprint")
+    suspend fun hasFingerprint(fingerprint: String): Boolean
 }
+

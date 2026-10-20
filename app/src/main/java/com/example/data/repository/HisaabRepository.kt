@@ -43,7 +43,24 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.time.LocalDate
 import java.util.Calendar
+import com.example.core.money.InstallmentSplitter
+import com.example.data.model.AuditLogEntity
+import com.example.data.model.CategoryBudgetEntity
+import com.example.data.model.CharityCategory
+import com.example.data.model.CharityRecordEntity
+import com.example.data.model.CharityStatus
+import com.example.data.model.ContributionStatus
+import com.example.data.model.InstallmentStatus
+import com.example.data.model.KametiCadence
+import com.example.data.model.KametiContributionEntity
+import com.example.data.model.KametiEntity
+import com.example.data.model.KametiPayoutEntity
+import com.example.data.model.KametiStatus
+import com.example.data.model.KarzInstallmentEntity
+import com.example.data.model.PayoutStatus
+import com.example.data.model.ZakatCalculationEntity
 
 class HisaabRepository(
     private val context: Context,
@@ -736,22 +753,35 @@ class HisaabRepository(
         accountId: Long? = null,
         recordCashMovement: Boolean = false,
         isInterestEnabled: Boolean = false,
-        interestRatePercent: Double = 0.0
+        interestRatePercent: Double = 0.0,
+        kind: com.example.data.model.DebtKind = com.example.data.model.DebtKind.MONEY,
+        itemDescription: String = "",
+        itemQuantity: Double? = null,
+        itemUnit: String = "",
+        estimatedValuePaisa: Long? = null
     ): Long = withContext(Dispatchers.IO) {
         require(personName.isNotBlank()) { "Person name is required" }
         require(amountPaisa > 0L) { "Amount must be greater than zero" }
+
+        // Invariant I-4: Item/service debts NEVER touch accounts
+        val effectiveRecordCash = recordCashMovement && (kind == com.example.data.model.DebtKind.MONEY)
 
         val debt = DebtEntity(
             personName = personName.trim(),
             direction = direction,
             originalPrincipalPaisa = amountPaisa,
+            kind = kind,
+            itemDescription = itemDescription.trim(),
+            itemQuantity = itemQuantity,
+            itemUnit = itemUnit.trim(),
+            estimatedValuePaisa = estimatedValuePaisa,
             dateEpochMs = dateEpochMs,
             dueDateEpochMs = dueDateEpochMs,
             description = description.trim(),
             phoneNumber = phoneNumber.trim(),
             notes = notes.trim(),
             status = DebtStatus.ACTIVE,
-            linkedAccountId = if (recordCashMovement) accountId else null,
+            linkedAccountId = if (effectiveRecordCash) accountId else null,
             isInterestEnabled = isInterestEnabled,
             interestRatePercent = interestRatePercent,
             createdAtEpochMs = System.currentTimeMillis(),
@@ -760,7 +790,7 @@ class HisaabRepository(
         val debtId = dao.insertDebt(debt)
 
         var createdTxId: Long? = null
-        if (recordCashMovement && accountId != null) {
+        if (effectiveRecordCash && accountId != null) {
             val txType = if (direction == DebtDirection.I_GAVE) {
                 TransactionType.DEBT_LENT
             } else {
@@ -985,6 +1015,366 @@ class HisaabRepository(
     suspend fun deleteDebt(debtId: Long) = withContext(Dispatchers.IO) {
         dao.deleteDebtEventsForDebt(debtId)
         dao.deleteDebtById(debtId)
+    }
+
+    // --- Karz Installments ---
+    fun getInstallmentsForDebtFlow(debtId: Long): Flow<List<KarzInstallmentEntity>> =
+        dao.getInstallmentsForDebtFlow(debtId)
+
+    suspend fun splitDebtIntoInstallments(
+        debtId: Long,
+        count: Int,
+        isWeekly: Boolean,
+        firstDueDateEpochDay: Long
+    ) = withContext(Dispatchers.IO) {
+        val debt = dao.getDebtById(debtId) ?: throw IllegalArgumentException("Debt not found")
+        require(debt.kind == com.example.data.model.DebtKind.MONEY) { "Installments only available for money debts" }
+        require(count in 2..120) { "Installment count must be between 2 and 120" }
+
+        val events = dao.getDebtEventsForDebt(debtId)
+        val totalPrincipal = debt.originalPrincipalPaisa + events.filter { it.type == DebtEventType.ADDITIONAL_ADVANCE }.sumOf { it.amountPaisa }
+        val currentRepaid = events.filter { it.type == DebtEventType.REPAYMENT }.sumOf { it.amountPaisa }
+        val currentAdjustments = events.filter { it.type == DebtEventType.ADJUSTMENT }.sumOf { it.amountPaisa }
+        val outstandingPaisa = (totalPrincipal - currentRepaid + currentAdjustments).coerceAtLeast(0L)
+        require(outstandingPaisa > 0L) { "Debt is already settled or has no outstanding balance" }
+
+        val splitAmounts = InstallmentSplitter.split(outstandingPaisa, count)
+        val anchorDate = LocalDate.ofEpochDay(firstDueDateEpochDay)
+        val dueDates = if (isWeekly) {
+            InstallmentSplitter.weeklyDates(anchorDate, count)
+        } else {
+            InstallmentSplitter.monthlyDates(anchorDate, count)
+        }
+
+        val installments = splitAmounts.mapIndexed { index, amount ->
+            KarzInstallmentEntity(
+                debtId = debtId,
+                number = index + 1,
+                totalCount = count,
+                dueDateEpochDay = dueDates[index].toEpochDay(),
+                scheduledPaisa = amount,
+                paidPaisa = 0L,
+                status = InstallmentStatus.SCHEDULED,
+                note = "Installment ${index + 1} of $count"
+            )
+        }
+        dao.insertInstallments(installments)
+        dao.insertAuditLog(
+            AuditLogEntity(
+                createdAtEpochMs = System.currentTimeMillis(),
+                entityType = "KARZ_INSTALLMENTS",
+                entityId = debtId,
+                action = "SPLIT",
+                amountPaisa = outstandingPaisa
+            )
+        )
+    }
+
+    suspend fun recordKarzInstallmentPayment(
+        installment: KarzInstallmentEntity,
+        amountPaisa: Long,
+        accountId: Long?,
+        recordCashMovement: Boolean,
+        dateEpochMs: Long,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        require(amountPaisa > 0L) { "Payment amount must be positive" }
+        val newPaid = installment.paidPaisa + amountPaisa
+        require(newPaid <= installment.scheduledPaisa) { "Payment cannot exceed installment amount" }
+
+        val newStatus = if (newPaid >= installment.scheduledPaisa) InstallmentStatus.PAID else InstallmentStatus.PARTIAL
+        dao.updateInstallment(
+            installment.copy(
+                paidPaisa = newPaid,
+                status = newStatus,
+                note = if (note.isNotBlank()) note else installment.note
+            )
+        )
+
+        // Record repayment on parent debt
+        val eventId = recordDebtRepayment(
+            debtId = installment.debtId,
+            amountPaisa = amountPaisa,
+            dateEpochMs = dateEpochMs,
+            accountId = accountId,
+            recordCashMovement = recordCashMovement,
+            note = "Installment ${installment.number}/${installment.totalCount}" + if (note.isNotBlank()) " · $note" else ""
+        )
+
+        dao.insertAuditLog(
+            AuditLogEntity(
+                createdAtEpochMs = System.currentTimeMillis(),
+                entityType = "KARZ_INSTALLMENT",
+                entityId = installment.id,
+                action = "PAID",
+                amountPaisa = amountPaisa
+            )
+        )
+        eventId
+    }
+
+    suspend fun rescheduleInstallment(
+        installment: KarzInstallmentEntity,
+        newDueDateEpochDay: Long
+    ) = withContext(Dispatchers.IO) {
+        dao.updateInstallment(
+            installment.copy(
+                dueDateEpochDay = newDueDateEpochDay,
+                status = InstallmentStatus.RESCHEDULED
+            )
+        )
+        dao.insertAuditLog(
+            AuditLogEntity(
+                createdAtEpochMs = System.currentTimeMillis(),
+                entityType = "KARZ_INSTALLMENT",
+                entityId = installment.id,
+                action = "RESCHEDULED"
+            )
+        )
+    }
+
+    // --- Kameti (Committee Savings) ---
+    fun getAllKametisFlow(): Flow<List<KametiEntity>> = dao.getAllKametisFlow()
+
+    suspend fun getKametiById(id: Long): KametiEntity? = dao.getKametiById(id)
+
+    fun getContributionsForKametiFlow(kametiId: Long): Flow<List<KametiContributionEntity>> =
+        dao.getContributionsForKametiFlow(kametiId)
+
+    fun getPayoutForKametiFlow(kametiId: Long): Flow<KametiPayoutEntity?> =
+        dao.getPayoutForKametiFlow(kametiId)
+
+    suspend fun createKameti(
+        name: String,
+        memberCount: Int,
+        contributionPaisa: Long,
+        cadence: KametiCadence,
+        startDateEpochDay: Long,
+        totalInstallments: Int,
+        myPayoutInstallment: Int,
+        expectedPayoutPaisa: Long?,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        require(name.isNotBlank()) { "Committee name is required" }
+        require(memberCount >= 2) { "Member count must be at least 2" }
+        require(contributionPaisa > 0L) { "Contribution amount must be greater than zero" }
+        require(myPayoutInstallment in 1..totalInstallments) { "Payout installment must be between 1 and $totalInstallments" }
+
+        val kameti = KametiEntity(
+            name = name.trim(),
+            memberCount = memberCount,
+            contributionPaisa = contributionPaisa,
+            cadence = cadence,
+            startDateEpochDay = startDateEpochDay,
+            totalInstallments = totalInstallments,
+            myPayoutInstallment = myPayoutInstallment,
+            expectedPayoutPaisa = expectedPayoutPaisa ?: (contributionPaisa * memberCount),
+            status = KametiStatus.ACTIVE,
+            note = note.trim()
+        )
+        val kametiId = dao.insertKameti(kameti)
+
+        // Generate contribution schedule using InstallmentSplitter dates
+        val anchorDate = LocalDate.ofEpochDay(startDateEpochDay)
+        val dueDates = if (cadence == KametiCadence.WEEKLY) {
+            InstallmentSplitter.weeklyDates(anchorDate, totalInstallments)
+        } else {
+            InstallmentSplitter.monthlyDates(anchorDate, totalInstallments)
+        }
+
+        val contributions = dueDates.mapIndexed { index, date ->
+            KametiContributionEntity(
+                kametiId = kametiId,
+                installmentIndex = index + 1,
+                dueDateEpochDay = date.toEpochDay(),
+                expectedPaisa = contributionPaisa,
+                paidPaisa = 0L,
+                status = ContributionStatus.PENDING
+            )
+        }
+        dao.insertContributions(contributions)
+
+        // Insert payout record
+        val payoutDueDate = dueDates.getOrNull(myPayoutInstallment - 1)?.toEpochDay() ?: startDateEpochDay
+        val payout = KametiPayoutEntity(
+            kametiId = kametiId,
+            expectedDateEpochDay = payoutDueDate,
+            expectedPaisa = expectedPayoutPaisa ?: (contributionPaisa * memberCount),
+            status = PayoutStatus.EXPECTED
+        )
+        dao.insertPayout(payout)
+
+        dao.insertAuditLog(
+            AuditLogEntity(
+                createdAtEpochMs = System.currentTimeMillis(),
+                entityType = "KAMETI",
+                entityId = kametiId,
+                action = "CREATED",
+                amountPaisa = contributionPaisa
+            )
+        )
+        kametiId
+    }
+
+    suspend fun recordKametiContribution(
+        contributionId: Long,
+        accountId: Long,
+        amountPaisa: Long,
+        dateEpochDay: Long,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        val contribution = dao.getContributionById(contributionId) ?: throw IllegalArgumentException("Contribution not found")
+        val kameti = dao.getKametiById(contribution.kametiId) ?: throw IllegalArgumentException("Kameti not found")
+        require(amountPaisa > 0L) { "Payment amount must be greater than zero" }
+
+        val remaining = contribution.expectedPaisa - contribution.paidPaisa
+        require(amountPaisa <= remaining) { "Amount exceeds remaining installment balance" }
+
+        val now = System.currentTimeMillis()
+        val tx = TransactionEntity(
+            type = TransactionType.EXPENSE,
+            amountPaisa = amountPaisa,
+            fromAccountId = accountId,
+            toAccountId = null,
+            categoryId = null,
+            sourceType = "KAMETI_CONTRIBUTION",
+            sourceId = contributionId,
+            note = "Kameti contribution: ${kameti.name} (Installment ${contribution.installmentIndex})" + if (note.isNotBlank()) " · $note" else "",
+            dateEpochMs = LocalDate.ofEpochDay(dateEpochDay).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        val txId = dao.insertTransaction(tx)
+
+        val newPaid = contribution.paidPaisa + amountPaisa
+        dao.updateContribution(
+            contribution.copy(
+                paidPaisa = newPaid,
+                status = if (newPaid >= contribution.expectedPaisa) ContributionStatus.PAID else ContributionStatus.PARTIAL,
+                lastPaidDateEpochDay = dateEpochDay,
+                note = if (note.isNotBlank()) note else contribution.note
+            )
+        )
+
+        dao.insertAuditLog(
+            AuditLogEntity(
+                createdAtEpochMs = now,
+                entityType = "KAMETI_CONTRIBUTION",
+                entityId = contributionId,
+                action = "PAID",
+                amountPaisa = amountPaisa
+            )
+        )
+        txId
+    }
+
+    suspend fun claimKametiPayout(
+        payoutId: Long,
+        kametiId: Long,
+        accountId: Long,
+        receivedAmountPaisa: Long,
+        dateEpochDay: Long,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        val kameti = dao.getKametiById(kametiId) ?: throw IllegalArgumentException("Kameti not found")
+        val payout = dao.getPayoutForKameti(kametiId) ?: throw IllegalArgumentException("Payout not found")
+        require(receivedAmountPaisa > 0L) { "Payout amount must be greater than zero" }
+
+        val now = System.currentTimeMillis()
+        val tx = TransactionEntity(
+            type = TransactionType.INCOME,
+            amountPaisa = receivedAmountPaisa,
+            fromAccountId = null,
+            toAccountId = accountId,
+            categoryId = null,
+            sourceType = "KAMETI_PAYOUT",
+            sourceId = payout.id,
+            note = "Kameti Payout Received: ${kameti.name}" + if (note.isNotBlank()) " · $note" else "",
+            dateEpochMs = LocalDate.ofEpochDay(dateEpochDay).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        val txId = dao.insertTransaction(tx)
+
+        dao.updatePayout(
+            payout.copy(
+                receivedPaisa = receivedAmountPaisa,
+                receivedDateEpochDay = dateEpochDay,
+                status = PayoutStatus.RECEIVED,
+                transactionId = txId
+            )
+        )
+
+        dao.insertAuditLog(
+            AuditLogEntity(
+                createdAtEpochMs = now,
+                entityType = "KAMETI_PAYOUT",
+                entityId = payout.id,
+                action = "RECEIVED",
+                amountPaisa = receivedAmountPaisa
+            )
+        )
+        txId
+    }
+
+    suspend fun archiveKameti(kametiId: Long) = withContext(Dispatchers.IO) {
+        val kameti = dao.getKametiById(kametiId) ?: return@withContext
+        dao.updateKameti(kameti.copy(archived = true, status = KametiStatus.COMPLETED, updatedAtEpochMs = System.currentTimeMillis()))
+    }
+
+    // --- Zakat & Charity ---
+    fun getAllCharityRecordsFlow(): Flow<List<CharityRecordEntity>> = dao.getAllCharityRecordsFlow()
+
+    fun getAllZakatCalculationsFlow(): Flow<List<ZakatCalculationEntity>> = dao.getAllZakatCalculationsFlow()
+
+    suspend fun saveZakatCalculation(calculation: ZakatCalculationEntity): Long = withContext(Dispatchers.IO) {
+        dao.insertZakatCalculation(calculation)
+    }
+
+    suspend fun recordCharityPayment(
+        category: CharityCategory,
+        recipientName: String,
+        amountPaisa: Long,
+        dateEpochDay: Long,
+        accountId: Long?,
+        recordCashMovement: Boolean,
+        note: String
+    ): Long = withContext(Dispatchers.IO) {
+        require(amountPaisa > 0L) { "Charity amount must be positive" }
+
+        var txId: Long? = null
+        if (recordCashMovement && accountId != null) {
+            val tx = TransactionEntity(
+                type = TransactionType.EXPENSE,
+                amountPaisa = amountPaisa,
+                fromAccountId = accountId,
+                toAccountId = null,
+                categoryId = null,
+                note = "${category.name}: ${recipientName.trim()}" + if (note.isNotBlank()) " · $note" else "",
+                dateEpochMs = LocalDate.ofEpochDay(dateEpochDay).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            )
+            txId = dao.insertTransaction(tx)
+        }
+
+        val record = CharityRecordEntity(
+            category = category,
+            recipientName = recipientName.trim(),
+            amountPaisa = amountPaisa,
+            status = CharityStatus.PAID,
+            paidDateEpochDay = dateEpochDay,
+            accountId = if (recordCashMovement) accountId else null,
+            transactionId = txId,
+            note = note.trim()
+        )
+        dao.insertCharityRecord(record)
+    }
+
+    // --- Category Budgets ---
+    fun getAllCategoryBudgetsFlow(): Flow<List<CategoryBudgetEntity>> = dao.getAllCategoryBudgetsFlow()
+
+    suspend fun saveCategoryBudget(categoryId: Long, monthKey: String, limitPaisa: Long): Long = withContext(Dispatchers.IO) {
+        val budget = CategoryBudgetEntity(
+            categoryId = categoryId,
+            monthKey = monthKey,
+            limitPaisa = limitPaisa
+        )
+        dao.insertCategoryBudget(budget)
     }
 
     suspend fun exportDataAsJsonFile(): File = withContext(Dispatchers.IO) {

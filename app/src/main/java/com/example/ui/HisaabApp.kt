@@ -35,6 +35,9 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.KarzScreen
 import com.example.ui.screens.NeedsScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.PlansHubScreen
+import com.example.ui.screens.KametiScreen
+import com.example.ui.screens.ZakatScreen
 import androidx.compose.foundation.border
 import com.example.ui.security.BiometricLockScreen
 import com.example.ui.theme.ClayAccentLime
@@ -263,6 +266,34 @@ fun HisaabApp(
                             popUpTo(NavScreen.Home.route) { inclusive = true }
                         }
                     }
+                )
+            }
+
+            composable(NavScreen.Plans.route) {
+                PlansHubScreen(
+                    viewModel = viewModel,
+                    privacyMode = privacyMode,
+                    onNavigateToKameti = { navController.navigate(NavScreen.Kameti.route) },
+                    onNavigateToZakat = { navController.navigate(NavScreen.Zakat.route) },
+                    onNavigateToNeeds = { navController.navigate(NavScreen.Needs.route) }
+                )
+            }
+
+            composable(NavScreen.Kameti.route) {
+                KametiScreen(
+                    viewModel = viewModel,
+                    accounts = activeAccounts,
+                    privacyMode = privacyMode,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(NavScreen.Zakat.route) {
+                ZakatScreen(
+                    viewModel = viewModel,
+                    accounts = activeAccounts,
+                    privacyMode = privacyMode,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

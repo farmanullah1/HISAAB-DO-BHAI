@@ -16,11 +16,17 @@ enum class DebtStatus {
     WRITTEN_OFF
 }
 
+enum class DebtKind {
+    MONEY,
+    ITEM_SERVICE
+}
+
 @Entity(
     tableName = "debts",
     indices = [
         Index("direction"),
         Index("status"),
+        Index("kind"),
         Index("dateEpochMs"),
         Index("dueDateEpochMs")
     ]
@@ -31,6 +37,11 @@ data class DebtEntity(
     val personName: String,
     val direction: DebtDirection,
     val originalPrincipalPaisa: Long,
+    val kind: DebtKind = DebtKind.MONEY,
+    val itemDescription: String = "",
+    val itemQuantity: Double? = null,
+    val itemUnit: String = "",
+    val estimatedValuePaisa: Long? = null,
     val dateEpochMs: Long = System.currentTimeMillis(),
     val dueDateEpochMs: Long? = null,
     val description: String = "",
