@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -46,6 +48,9 @@ fun AddNeedDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = if (initialNeed == null) "Add to What I Need" else "Edit Need",
@@ -67,6 +72,7 @@ fun AddNeedDialog(
                     isError = nameError,
                     supportingText = if (nameError) { { Text("Item name is required") } } else null,
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("need_name_input")
@@ -82,6 +88,7 @@ fun AddNeedDialog(
                     label = { Text("Expected Price (PKR, optional)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("need_price_input")
@@ -92,6 +99,7 @@ fun AddNeedDialog(
                     onValueChange = { whereToGet = it },
                     label = { Text("Shop / Seller (optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("need_where_input")
@@ -102,6 +110,7 @@ fun AddNeedDialog(
                     onValueChange = { externalUrl = it },
                     label = { Text("Online Link / URL (optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("need_url_input")
@@ -112,6 +121,7 @@ fun AddNeedDialog(
                     onValueChange = { note = it },
                     label = { Text("Notes (optional)") },
                     maxLines = 3,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("need_note_input")
@@ -132,8 +142,10 @@ fun AddNeedDialog(
                     containerColor = ClayInkDeep,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("need_save_button")
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .testTag("need_save_button")
             ) {
                 Text("Save")
             }
@@ -141,11 +153,11 @@ fun AddNeedDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Cancel", color = MaterialTheme.colorScheme.secondary)
             }
-        },
-        shape = RoundedCornerShape(18.dp)
+        }
     )
 }

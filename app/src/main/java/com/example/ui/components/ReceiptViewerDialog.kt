@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -45,6 +47,9 @@ fun ReceiptViewerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(text = "Receipt Attachment", style = MaterialTheme.typography.titleLarge)
         },
@@ -76,6 +81,7 @@ fun ReceiptViewerDialog(
                             .fillMaxWidth()
                             .height(180.dp)
                             .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp))
                             .background(ClaySurface),
                         contentAlignment = Alignment.Center
                     ) {
@@ -95,11 +101,11 @@ fun ReceiptViewerDialog(
                     containerColor = ClayInkDeep,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Close")
             }
-        },
-        shape = RoundedCornerShape(18.dp)
+        }
     )
 }

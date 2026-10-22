@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,9 +16,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -138,14 +141,19 @@ fun SettingsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        LazyColumn(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .testTag("settings_screen"),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            val isWideScreen = maxWidth >= 600.dp
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("settings_screen"),
+                contentPadding = PaddingValues(horizontal = if (isWideScreen) 24.dp else 20.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
             // Screen Header
             item {
                 Column {
@@ -180,6 +188,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(ClaySurface)
+                                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                     .clickable { editingAccount = item.account }
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -242,6 +251,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(ClaySurface)
+                                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                     .clickable { editingCategory = cat }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -311,6 +321,7 @@ fun SettingsScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(ClaySurface)
+                                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -361,6 +372,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(ClaySurface)
+                                .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                 .clickable { showReconciliationDialog = true }
                                 .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -399,6 +411,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(ClaySurface)
+                                .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -452,6 +465,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(ClaySurface)
+                                .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -498,6 +512,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(ClaySurface)
+                                .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                 .clickable { showSetPinDialog = true }
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -526,7 +541,7 @@ fun SettingsScreen(
                             }
                             OutlinedButton(
                                 onClick = { showSetPinDialog = true },
-                                modifier = Modifier.testTag("change_pin_button")
+                                modifier = Modifier.heightIn(min = 40.dp).testTag("change_pin_button")
                             ) {
                                 Text("Edit PIN", style = MaterialTheme.typography.labelSmall, color = ClayInkDeep)
                             }
@@ -538,6 +553,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(ClaySurface)
+                                .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp))
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -625,7 +641,7 @@ fun SettingsScreen(
                                     contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f).testTag("export_json_button")
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("export_json_button")
                             ) {
                                 Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -635,7 +651,7 @@ fun SettingsScreen(
                             OutlinedButton(
                                 onClick = { showRestoreDialog = true },
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f).testTag("restore_json_button")
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("restore_json_button")
                             ) {
                                 Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -685,6 +701,7 @@ fun SettingsScreen(
             }
         }
     }
+}
 
     if (showAddAccountDialog) {
         AddAccountDialog(
@@ -787,6 +804,9 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showSetPinDialog = false },
+            modifier = Modifier.widthIn(max = 500.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
             title = {
                 Text(
                     text = "Configure 4-Digit Vault PIN",
@@ -812,6 +832,7 @@ fun SettingsScreen(
                         },
                         label = { Text("4-Digit PIN") },
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
                         ),
@@ -843,13 +864,17 @@ fun SettingsScreen(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep, contentColor = Color.White),
-                    modifier = Modifier.testTag("save_pin_button")
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.heightIn(min = 44.dp).testTag("save_pin_button")
                 ) {
                     Text("Save PIN")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSetPinDialog = false }) {
+                TextButton(
+                    onClick = { showSetPinDialog = false },
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
                     Text("Cancel", color = ClayTextSecondary)
                 }
             }
@@ -890,12 +915,21 @@ private fun ClaySectionCard(
                 )
 
                 if (actionTitle != null && onAction != null) {
-                    Text(
-                        text = actionTitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ClayInkDeep,
-                        modifier = Modifier.clickable { onAction() }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(9999.dp))
+                            .background(ClayAccentLime.copy(alpha = 0.25f))
+                            .border(1.dp, ClayAccentLime.copy(alpha = 0.6f), RoundedCornerShape(9999.dp))
+                            .clickable { onAction() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = actionTitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = ClayInkDeep
+                        )
+                    }
                 }
             }
 

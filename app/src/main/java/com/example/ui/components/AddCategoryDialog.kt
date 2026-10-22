@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.CategoryEntity
 import com.example.data.model.CategoryType
 import com.example.domain.Money
+import com.example.ui.theme.ClayBorderHairline
 
 @Composable
 fun AddCategoryDialog(
@@ -73,6 +76,9 @@ fun AddCategoryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = if (initialCategory == null) "New Category" else "Edit Category",
@@ -94,6 +100,7 @@ fun AddCategoryDialog(
                     isError = nameError,
                     supportingText = if (nameError) { { Text("Category name cannot be blank") } } else null,
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("category_name_input")
@@ -108,6 +115,13 @@ fun AddCategoryDialog(
                             selected = selectedType == type,
                             onClick = { selectedType = type },
                             label = { Text(type.name, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedType == type,
+                                borderColor = ClayBorderHairline,
+                                selectedBorderColor = MaterialTheme.colorScheme.primary
+                            ),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary
@@ -127,6 +141,7 @@ fun AddCategoryDialog(
                         label = { Text("Monthly Budget Limit (PKR, optional)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("category_limit_input")
@@ -155,7 +170,7 @@ fun AddCategoryDialog(
                                 )
                                 .border(
                                     1.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else ClayBorderHairline,
                                     RoundedCornerShape(8.dp)
                                 )
                                 .clickable { selectedIcon = key },
@@ -191,8 +206,8 @@ fun AddCategoryDialog(
                                 .clip(CircleShape)
                                 .background(color)
                                 .border(
-                                    width = if (isSelected) 2.dp else 0.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else ClayBorderHairline,
                                     shape = CircleShape
                                 )
                                 .clickable { selectedColor = hex }
@@ -216,7 +231,9 @@ fun AddCategoryDialog(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("category_save_button")
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .testTag("category_save_button")
             ) {
                 Text("Save")
             }
@@ -224,11 +241,11 @@ fun AddCategoryDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Cancel", color = MaterialTheme.colorScheme.secondary)
             }
-        },
-        shape = RoundedCornerShape(16.dp)
+        }
     )
 }

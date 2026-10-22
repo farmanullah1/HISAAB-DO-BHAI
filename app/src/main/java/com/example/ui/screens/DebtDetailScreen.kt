@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -835,7 +837,17 @@ fun DebtDetailScreen(
         var reason by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showSettleDialog = false },
-            title = { Text("Settle / Write Off Debt") },
+            modifier = Modifier.widthIn(max = 500.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Settle / Write Off Debt",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ClayTextPrimary
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -853,6 +865,7 @@ fun DebtDetailScreen(
                         onValueChange = { reason = it },
                         placeholder = { Text("Reason (required)") },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
                 }
@@ -866,13 +879,19 @@ fun DebtDetailScreen(
                         }
                     },
                     enabled = reason.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("Confirm Settlement")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSettleDialog = false }) {
+                TextButton(
+                    onClick = { showSettleDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
                     Text("Cancel", color = ClayTextSecondary)
                 }
             }
@@ -883,9 +902,23 @@ fun DebtDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Debt Record?") },
+            modifier = Modifier.widthIn(max = 500.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Delete Debt Record?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ClayTextPrimary
+                )
+            },
             text = {
-                Text("This will permanently remove this debt and its activity history. Any past cash movements in accounts will remain intact.")
+                Text(
+                    "This will permanently remove this debt and its activity history. Any past cash movements in accounts will remain intact.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ClayTextSecondary
+                )
             },
             confirmButton = {
                 Button(
@@ -893,13 +926,19 @@ fun DebtDetailScreen(
                         showDeleteDialog = false
                         onDeleteDebt(debt.id)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = SemanticExpense)
+                    colors = ButtonDefaults.buttonColors(containerColor = SemanticExpense),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("Delete Permanently")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                TextButton(
+                    onClick = { showDeleteDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
                     Text("Cancel", color = ClayTextSecondary)
                 }
             }
@@ -918,15 +957,30 @@ fun DebtDetailScreen(
 
         AlertDialog(
             onDismissRequest = { showSplitInstallmentDialog = false },
-            title = { Text("Split into Installments (اقساط)") },
+            modifier = Modifier.widthIn(max = 500.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Split into Installments (اقساط)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ClayTextPrimary
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Divide outstanding balance of ${PkrFormatter.format(debtDetails.outstandingPaisa)} into scheduled installments.")
+                    Text(
+                        "Divide outstanding balance of ${PkrFormatter.format(debtDetails.outstandingPaisa)} into scheduled installments.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ClayTextSecondary
+                    )
                     OutlinedTextField(
                         value = countText,
                         onValueChange = { countText = it },
                         label = { Text("Number of Installments (2-120)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -1002,14 +1056,20 @@ fun DebtDetailScreen(
                             showSplitInstallmentDialog = false
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("Confirm Schedule")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSplitInstallmentDialog = false }) {
-                    Text("Cancel")
+                TextButton(
+                    onClick = { showSplitInstallmentDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
+                    Text("Cancel", color = ClayTextSecondary)
                 }
             }
         )
@@ -1023,24 +1083,59 @@ fun DebtDetailScreen(
 
         AlertDialog(
             onDismissRequest = { payingInstallment = null },
-            title = { Text("Pay Installment ${inst.number}/${inst.totalCount}") },
+            modifier = Modifier.widthIn(max = 500.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Pay Installment ${inst.number}/${inst.totalCount}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ClayTextPrimary
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Amount due: ${PkrFormatter.format(inst.scheduledPaisa - inst.paidPaisa)}")
+                    Text(
+                        text = "Amount due: ${PkrFormatter.format(inst.scheduledPaisa - inst.paidPaisa)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                     if (accounts.isNotEmpty()) {
                         Text("Account:", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
-                        accounts.forEach { acc ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedAccId = acc.id }
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (acc.id == selectedAccId) "●  ${acc.name}" else "○  ${acc.name}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            accounts.forEach { acc ->
+                                val isSelected = acc.id == selectedAccId
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) ClayInkDeep else ClayBorderHairline,
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { selectedAccId = acc.id },
+                                    color = if (isSelected) ClaySurface else Color.Transparent
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isSelected) "●" else "○",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isSelected) ClayInkDeep else ClayTextSecondary,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                        Text(
+                                            text = acc.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = ClayTextPrimary,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1048,6 +1143,7 @@ fun DebtDetailScreen(
                         value = note,
                         onValueChange = { note = it },
                         label = { Text("Payment Note (Optional)") },
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1064,14 +1160,20 @@ fun DebtDetailScreen(
                         )
                         payingInstallment = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("Record Payment")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { payingInstallment = null }) {
-                    Text("Cancel")
+                TextButton(
+                    onClick = { payingInstallment = null },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
+                ) {
+                    Text("Cancel", color = ClayTextSecondary)
                 }
             }
         )
@@ -1205,7 +1307,17 @@ fun DebtRepaymentDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(dialogTitle) },
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = dialogTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = ClayTextPrimary
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
@@ -1222,6 +1334,7 @@ fun DebtRepaymentDialog(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, if (amountPaisa == maxAmountPaisa) ClayInkDeep else ClayBorderHairline, RoundedCornerShape(8.dp))
                             .background(if (amountPaisa == maxAmountPaisa) ClayInkDeep else ClaySurface)
                             .clickable { amountInput = Money.toDecimalString(maxAmountPaisa) }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -1239,6 +1352,7 @@ fun DebtRepaymentDialog(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, if (amountPaisa == halfPaisa) ClayInkDeep else ClayBorderHairline, RoundedCornerShape(8.dp))
                                 .background(if (amountPaisa == halfPaisa) ClayInkDeep else ClaySurface)
                                 .clickable { amountInput = Money.toDecimalString(halfPaisa) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -1258,6 +1372,7 @@ fun DebtRepaymentDialog(
                     label = { Text("Payment Amount (PKR) *") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -1313,6 +1428,7 @@ fun DebtRepaymentDialog(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (sel) ClayInkDeep else ClayBorderHairline, RoundedCornerShape(8.dp))
                                     .background(if (sel) ClayInkDeep else ClaySurface)
                                     .clickable { selectedAccountId = acc.id }
                                     .padding(horizontal = 8.dp, vertical = 6.dp)
@@ -1332,6 +1448,7 @@ fun DebtRepaymentDialog(
                     onValueChange = { note = it },
                     label = { Text("Note (Optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -1348,13 +1465,19 @@ fun DebtRepaymentDialog(
                     )
                 },
                 enabled = isValid,
-                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Confirm Repayment")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
                 Text("Cancel", color = ClayTextSecondary)
             }
         }
@@ -1382,7 +1505,17 @@ fun DebtAdvanceDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (debt.direction == DebtDirection.I_GAVE) "Give Additional Money" else "Borrow Additional Money") },
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = if (debt.direction == DebtDirection.I_GAVE) "Give Additional Money" else "Borrow Additional Money",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = ClayTextPrimary
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
@@ -1391,6 +1524,7 @@ fun DebtAdvanceDialog(
                     label = { Text("Advance Amount (PKR) *") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -1444,6 +1578,7 @@ fun DebtAdvanceDialog(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, if (sel) ClayInkDeep else ClayBorderHairline, RoundedCornerShape(8.dp))
                                     .background(if (sel) ClayInkDeep else ClaySurface)
                                     .clickable { selectedAccountId = acc.id }
                                     .padding(horizontal = 8.dp, vertical = 6.dp)
@@ -1463,6 +1598,7 @@ fun DebtAdvanceDialog(
                     onValueChange = { note = it },
                     label = { Text("Note (Optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -1479,13 +1615,19 @@ fun DebtAdvanceDialog(
                     )
                 },
                 enabled = isValid,
-                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Confirm Advance")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
                 Text("Cancel", color = ClayTextSecondary)
             }
         }

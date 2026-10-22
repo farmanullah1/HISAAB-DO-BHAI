@@ -145,6 +145,7 @@ fun MonthlySummaryCard(
                         .weight(1f)
                         .clip(RoundedCornerShape(14.dp))
                         .background(ClaySurface)
+                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -187,6 +188,7 @@ fun MonthlySummaryCard(
                         .weight(1f)
                         .clip(RoundedCornerShape(14.dp))
                         .background(ClaySurface)
+                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

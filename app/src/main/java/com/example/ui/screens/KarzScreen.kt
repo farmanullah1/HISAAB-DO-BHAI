@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.DebtDirection
+import com.example.data.model.DebtKind
 import com.example.data.model.DebtStatus
 import com.example.data.model.DebtWithDetails
 import com.example.data.model.KarzSummary
@@ -96,6 +98,12 @@ fun KarzScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchVisible by remember { mutableStateOf(false) }
 
+    val activeCount = remember(debts) { debts.count { it.outstandingPaisa > 0 && !it.isOverdue } }
+    val dueSoonCount = remember(debts) { debts.count { it.isDueSoon } }
+    val overdueCount = remember(debts) { debts.count { it.isOverdue } }
+    val settledCount = remember(debts) { debts.count { it.debt.status == DebtStatus.SETTLED || it.debt.status == DebtStatus.WRITTEN_OFF } }
+    val allCount = remember(debts) { debts.size }
+
     val filteredDebts = remember(debts, selectedTab, searchQuery) {
         debts.filter { item ->
             val matchesTab = when (selectedTab) {
@@ -121,14 +129,19 @@ fun KarzScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        LazyColumn(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .testTag("karz_screen_list"),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            val isWideScreen = maxWidth >= 600.dp
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("karz_screen_list"),
+                contentPadding = PaddingValues(horizontal = if (isWideScreen) 24.dp else 20.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // Header
             item {
                 Row(
@@ -139,7 +152,7 @@ fun KarzScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(ClayAccentLime),
                             contentAlignment = Alignment.Center
@@ -148,7 +161,7 @@ fun KarzScreen(
                                 imageVector = Icons.Default.Handshake,
                                 contentDescription = null,
                                 tint = ClayInkDeep,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
@@ -156,6 +169,7 @@ fun KarzScreen(
                             Text(
                                 text = "Karz Management",
                                 style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
                                 color = ClayTextPrimary
                             )
                             Text(
@@ -232,7 +246,7 @@ fun KarzScreen(
                             .weight(1f)
                             .height(48.dp)
                             .testTag("action_i_gave_karz"),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ClayInkDeep,
                             contentColor = Color.White
@@ -241,6 +255,7 @@ fun KarzScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.CallMade,
                             contentDescription = null,
+                            tint = ClayAccentLime,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -257,7 +272,7 @@ fun KarzScreen(
                             .weight(1f)
                             .height(48.dp)
                             .testTag("action_i_took_karz"),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = ClayInkDeep
                         ),
@@ -266,6 +281,7 @@ fun KarzScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.CallReceived,
                             contentDescription = null,
+                            tint = ClayInkDeep,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -278,7 +294,7 @@ fun KarzScreen(
                 }
             }
 
-            // Filter Tabs
+            // Filter Tabs with counter badges
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -286,13 +302,22 @@ fun KarzScreen(
                 ) {
                     items(KarzFilterTab.values()) { tab ->
                         val isSelected = selectedTab == tab
+                        val count = when (tab) {
+                            KarzFilterTab.ACTIVE -> activeCount
+                            KarzFilterTab.DUE_SOON -> dueSoonCount
+                            KarzFilterTab.OVERDUE -> overdueCount
+                            KarzFilterTab.SETTLED -> settledCount
+                            KarzFilterTab.ALL -> allCount
+                        }
+
                         FilterChip(
                             selected = isSelected,
                             onClick = { selectedTab = tab },
                             label = {
                                 Text(
-                                    text = tab.label,
-                                    style = MaterialTheme.typography.labelSmall
+                                    text = "${tab.label} ($count)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
@@ -307,7 +332,7 @@ fun KarzScreen(
                                 borderColor = if (isSelected) ClayAccentLime else ClayBorderHairline,
                                 selectedBorderColor = ClayAccentLime
                             ),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
                         )
                     }
@@ -347,6 +372,7 @@ fun KarzScreen(
         }
     }
 }
+}
 
 @Composable
 fun DebtCard(
@@ -381,52 +407,88 @@ fun DebtCard(
     } else 0f
 
     Surface(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, ClayBorderHairline, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp))
             .testTag("debt_card_${debt.id}"),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(18.dp)
         ) {
-            // Top Row: Person Name + Direction Badge
+            // Top Row: Avatar + Person Name + Direction Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = debt.personName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = ClayTextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (debt.phoneNumber.isNotBlank()) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isGave) SemanticIncome.copy(alpha = 0.12f)
+                                else SemanticExpense.copy(alpha = 0.12f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = debt.phoneNumber,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ClayTextSecondary
+                            text = debt.personName.firstOrNull()?.uppercase() ?: "?",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isGave) SemanticIncome else SemanticExpense
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = debt.personName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = ClayTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (debt.phoneNumber.isNotBlank()) {
+                            Text(
+                                text = debt.phoneNumber,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ClayTextSecondary
+                            )
+                        } else if (debt.description.isNotBlank()) {
+                            Text(
+                                text = debt.description,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ClayTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Direction Badge
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(9999.dp))
                         .background(
                             if (isGave) SemanticIncome.copy(alpha = 0.12f)
                             else SemanticExpense.copy(alpha = 0.12f)
                         )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -437,16 +499,16 @@ fun DebtCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isGave) "I Gave (قرض دیا)" else "I Took (قرض لیا)",
+                            text = if (isGave) "I Gave" else "I Took",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isGave) SemanticIncome else SemanticExpense,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Outstanding Amount Row
             Row(
@@ -456,12 +518,15 @@ fun DebtCard(
             ) {
                 Column {
                     Text(
-                        text = "Outstanding Balance",
+                        text = if (debt.kind == DebtKind.ITEM_SERVICE) "Item / Service Loan" else "Outstanding Balance",
                         style = MaterialTheme.typography.labelSmall,
                         color = ClayTextSecondary
                     )
                     Text(
-                        text = if (privacyMode) "••••••" else Money.formatPkr(item.outstandingPaisa),
+                        text = if (privacyMode) "₨ ••••••" else if (debt.kind == DebtKind.ITEM_SERVICE) {
+                            if (debt.itemQuantity != null) "${debt.itemQuantity} ${debt.itemUnit} ${debt.itemDescription}".trim()
+                            else debt.itemDescription.ifBlank { "Item Loan" }
+                        } else Money.formatPkr(item.outstandingPaisa),
                         style = MaterialTheme.typography.titleLarge,
                         color = if (isGave) SemanticIncome else SemanticExpense,
                         fontWeight = FontWeight.Bold
@@ -474,18 +539,18 @@ fun DebtCard(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(statusBadgeColor.copy(alpha = 0.12f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = statusBadgeText,
                             style = MaterialTheme.typography.labelSmall,
                             color = statusBadgeColor,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
                     if (debt.dueDateEpochMs != null) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Due: ${dateFormatter.format(Date(debt.dueDateEpochMs))}",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
@@ -495,36 +560,38 @@ fun DebtCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            if (debt.kind == DebtKind.MONEY) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Progress Bar
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(CircleShape),
-                color = if (isGave) SemanticIncome else SemanticExpense,
-                trackColor = ClaySurface
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Repaid vs Total
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (privacyMode) "Repaid: ••••••" else "Repaid: ${Money.formatPkr(item.totalRepaidPaisa)}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = ClayTextSecondary
+                // Progress Bar
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(CircleShape),
+                    color = if (isGave) SemanticIncome else SemanticExpense,
+                    trackColor = ClaySurface
                 )
-                Text(
-                    text = if (privacyMode) "Total: ••••••" else "Total: ${Money.formatPkr(item.totalPrincipalPaisa)}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = ClayTextSecondary
-                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Repaid vs Total
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (privacyMode) "Repaid: ••••••" else "Repaid: ${Money.formatPkr(item.totalRepaidPaisa)} (${(progress * 100).toInt()}%)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = ClayTextSecondary
+                    )
+                    Text(
+                        text = if (privacyMode) "Total: ••••••" else "Total: ${Money.formatPkr(item.totalPrincipalPaisa)}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = ClayTextSecondary
+                    )
+                }
             }
         }
     }

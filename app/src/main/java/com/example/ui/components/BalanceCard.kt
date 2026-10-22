@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.money.PkrFormatter
@@ -245,7 +246,7 @@ fun BalanceCard(
                         .background(if (isAllSelected) ClayAccentLime else ClaySurface)
                         .border(
                             width = 1.dp,
-                            color = if (isAllSelected) ClayInkDeep.copy(alpha = 0.3f) else Color.Transparent,
+                            color = if (isAllSelected) ClayInkDeep.copy(alpha = 0.3f) else ClayBorderHairline,
                             shape = RoundedCornerShape(9999.dp)
                         )
                         .clickable { onAccountSelected(null) }
@@ -272,7 +273,7 @@ fun BalanceCard(
                             .background(if (isSelected) ClayAccentLime else ClaySurface)
                             .border(
                                 width = 1.dp,
-                                color = if (isSelected) ClayInkDeep.copy(alpha = 0.3f) else Color.Transparent,
+                                color = if (isSelected) ClayInkDeep.copy(alpha = 0.3f) else ClayBorderHairline,
                                 shape = RoundedCornerShape(9999.dp)
                             )
                             .clickable { onAccountSelected(if (isSelected) null else accWithBal.account.id) }
@@ -288,7 +289,7 @@ fun BalanceCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (privacyMode) accWithBal.account.name else "${accWithBal.account.name} · ${PkrFormatter.format(accWithBal.currentBalancePaisa)}",
+                            text = if (privacyMode) accWithBal.account.name else "${accWithBal.account.name} · ${PkrFormatter.format(accWithBal.balancePaisa)}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = ClayInkDeep

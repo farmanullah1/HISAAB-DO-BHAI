@@ -1,13 +1,17 @@
 package com.example.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -94,15 +98,24 @@ fun HisaabApp(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = 0.dp,
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .testTag("bottom_nav_bar")
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                contentAlignment = Alignment.Center
             ) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 0.dp,
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 840.dp)
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        .testTag("bottom_nav_bar")
+                ) {
                 NavScreen.items.forEach { screen ->
                     val isSelected = currentRoute == screen.route
                     NavigationBarItem(
@@ -119,10 +132,27 @@ fun HisaabApp(
                             }
                         },
                         icon = {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = screen.title
-                            )
+                            if (screen == NavScreen.Add) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) ClayAccentLime else ClayInkDeep),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = screen.title,
+                                        tint = if (isSelected) ClayInkDeep else Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = screen.icon,
+                                    contentDescription = screen.title
+                                )
+                            }
                         },
                         label = {
                             Text(
@@ -141,13 +171,26 @@ fun HisaabApp(
                     )
                 }
             }
+            }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = NavScreen.Home.route,
-            modifier = Modifier.padding(innerPadding)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth()
+            ) {
+                NavHost(
+                    navController = navController,
+                    startDestination = NavScreen.Home.route,
+                    modifier = Modifier.fillMaxSize()
+                ) {
             composable(NavScreen.Home.route) {
                 HomeScreen(
                     totalBalancePaisa = totalBalancePaisa,
@@ -350,6 +393,8 @@ fun HisaabApp(
                     onExportJson = { viewModel.exportJsonFile() },
                     onRestoreJson = { viewModel.restoreDataFromJson(it) }
                 )
+            }
+        }
             }
         }
     }

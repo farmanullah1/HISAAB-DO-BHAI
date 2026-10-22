@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,6 +126,7 @@ fun TransactionDetailDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
+                .widthIn(max = 520.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .border(1.dp, ClayBorderHairline, RoundedCornerShape(24.dp)),
             color = MaterialTheme.colorScheme.background,

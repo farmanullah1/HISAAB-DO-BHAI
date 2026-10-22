@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.model.AccountWithBalance
 import com.example.domain.Money
+import com.example.ui.theme.ClayBorderHairline
 import com.example.ui.theme.SemanticExpense
 import com.example.ui.theme.SemanticIncome
 import com.example.ui.theme.SemanticWarning
@@ -56,6 +59,9 @@ fun ReconciliationDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = "Account Reconciliation",
@@ -84,6 +90,7 @@ fun ReconciliationDialog(
                             readOnly = true,
                             label = { Text("Account") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDropdown) },
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .menuAnchor()
                                 .fillMaxWidth()
@@ -111,6 +118,7 @@ fun ReconciliationDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(12.dp)
                     ) {
@@ -138,6 +146,7 @@ fun ReconciliationDialog(
                         label = { Text("Actual Statement / Cash (PKR)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("reconciliation_actual_input")
@@ -188,6 +197,7 @@ fun ReconciliationDialog(
                         onValueChange = { note = it },
                         label = { Text("Reconciliation Note (optional)") },
                         maxLines = 2,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("reconciliation_note_input")
@@ -202,7 +212,8 @@ fun ReconciliationDialog(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Done")
             }
@@ -210,12 +221,12 @@ fun ReconciliationDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Close", color = MaterialTheme.colorScheme.secondary)
             }
-        },
-        shape = RoundedCornerShape(16.dp)
+        }
     )
 }
 

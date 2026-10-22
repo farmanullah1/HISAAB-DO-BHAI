@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.AccountEntity
 import com.example.data.model.AccountType
 import com.example.domain.Money
+import com.example.ui.theme.ClayBorderHairline
 
 @Composable
 fun AddAccountDialog(
@@ -67,6 +70,9 @@ fun AddAccountDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = if (initialAccount == null) "New Account" else "Edit Account",
@@ -88,6 +94,7 @@ fun AddAccountDialog(
                     isError = nameError,
                     supportingText = if (nameError) { { Text("Account name cannot be blank") } } else null,
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("account_name_input")
@@ -114,6 +121,13 @@ fun AddAccountDialog(
                             selected = selectedType == type,
                             onClick = { selectedType = type },
                             label = { Text(displayLabel, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedType == type,
+                                borderColor = ClayBorderHairline,
+                                selectedBorderColor = MaterialTheme.colorScheme.primary
+                            ),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary
@@ -132,6 +146,7 @@ fun AddAccountDialog(
                     label = { Text("Opening Balance (PKR)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("account_opening_balance_input")
@@ -157,8 +172,8 @@ fun AddAccountDialog(
                                 .clip(CircleShape)
                                 .background(color)
                                 .border(
-                                    width = if (isSelected) 2.dp else 0.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else ClayBorderHairline,
                                     shape = CircleShape
                                 )
                                 .clickable { selectedColor = hex }
@@ -182,7 +197,9 @@ fun AddAccountDialog(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("account_save_button")
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .testTag("account_save_button")
             ) {
                 Text("Save")
             }
@@ -190,11 +207,11 @@ fun AddAccountDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Cancel", color = MaterialTheme.colorScheme.secondary)
             }
-        },
-        shape = RoundedCornerShape(16.dp)
+        }
     )
 }

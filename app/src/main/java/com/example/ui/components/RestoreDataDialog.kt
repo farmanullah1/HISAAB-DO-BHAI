@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,6 +35,9 @@ fun RestoreDataDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(text = "Restore / Import Ledger", style = MaterialTheme.typography.titleLarge)
         },
@@ -56,6 +61,7 @@ fun RestoreDataDialog(
                     label = { Text("Backup JSON Content") },
                     placeholder = { Text("{\n  \"app\": \"Hisaab Do Bhai\"...\n}") },
                     maxLines = 8,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().testTag("restore_json_input")
                 )
 
@@ -81,17 +87,22 @@ fun RestoreDataDialog(
                     containerColor = ClayInkDeep,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("confirm_restore_button")
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .testTag("confirm_restore_button")
             ) {
                 Text("Validate & Restore")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
                 Text("Cancel", color = MaterialTheme.colorScheme.secondary)
             }
-        },
-        shape = RoundedCornerShape(18.dp)
+        }
     )
 }

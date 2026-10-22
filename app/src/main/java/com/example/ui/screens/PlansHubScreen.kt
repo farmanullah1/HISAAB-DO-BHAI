@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -93,13 +94,17 @@ fun PlansHubScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
         ) {
+            val isWideScreen = maxWidth >= 600.dp
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = if (isWideScreen) 24.dp else 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // Header Hero Banner
             item {
                 Surface(
@@ -143,96 +148,197 @@ fun PlansHubScreen(
                 }
             }
 
-            // 1. Kameti Savings Module
-            item {
-                PlanModuleCard(
-                    title = "Kameti Savings (کمیٹی)",
-                    subtitle = if (kametis.isEmpty()) "Start a committee pool or track contributions" else "${kametis.size} Active Circles · Payouts & contributions",
-                    badge = if (kametis.isNotEmpty()) "${kametis.size} Active" else null,
-                    icon = Icons.Default.Savings,
-                    iconTint = SemanticIncome,
-                    iconBg = SemanticIncome.copy(alpha = 0.12f),
-                    tag = "kameti_module_card",
-                    onClick = onNavigateToKameti
-                )
-            }
-
-            // 2. Zakat & Charity Module
-            item {
-                PlanModuleCard(
-                    title = "Zakat & Charity (زکوٰۃ و صدقات)",
-                    subtitle = "Gold/Silver Nisab calculator, 2.5% calculation & donation history",
-                    badge = "2.5% Nisab",
-                    icon = Icons.Default.VolunteerActivism,
-                    iconTint = Color(0xFFB45309),
-                    iconBg = Color(0xFFFDE68A).copy(alpha = 0.45f),
-                    tag = "zakat_module_card",
-                    onClick = onNavigateToZakat
-                )
-            }
-
-            // 3. Needs & Priorities Module
-            item {
-                PlanModuleCard(
-                    title = "Needs & Wishlist (ضروریات)",
-                    subtitle = if (activeNeeds.isEmpty()) "Organize planned purchases by priority" else "${activeNeeds.size} Pending purchase goals and priorities",
-                    badge = if (activeNeeds.isNotEmpty()) "${activeNeeds.size} Items" else null,
-                    icon = Icons.Default.Checklist,
-                    iconTint = ClayInkDeep,
-                    iconBg = ClayAccentLime.copy(alpha = 0.35f),
-                    tag = "needs_module_card",
-                    onClick = onNavigateToNeeds
-                )
-            }
-
-            // 4. Recurring Bills summary item
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
-                    color = ClaySurface,
-                    shape = RoundedCornerShape(18.dp)
-                ) {
+            if (isWideScreen) {
+                // Wide Screen: Row 1 (Kameti & Zakat)
+                item {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(ClayPanelBlue),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = null,
-                                tint = ClayInkDeep,
-                                modifier = Modifier.size(24.dp)
+                        Box(modifier = Modifier.weight(1f)) {
+                            PlanModuleCard(
+                                title = "Kameti Savings (کمیٹی)",
+                                subtitle = if (kametis.isEmpty()) "Start a committee pool or track contributions" else "${kametis.size} Active Circles · Payouts & contributions",
+                                badge = if (kametis.isNotEmpty()) "${kametis.size} Active" else null,
+                                icon = Icons.Default.Savings,
+                                iconTint = SemanticIncome,
+                                iconBg = SemanticIncome.copy(alpha = 0.12f),
+                                tag = "kameti_module_card",
+                                onClick = onNavigateToKameti
                             )
                         }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Automated Recurring Bills",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ClayTextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "${recurringRules.size} recurring payment rules currently scheduled",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ClayTextSecondary
+                        Box(modifier = Modifier.weight(1f)) {
+                            PlanModuleCard(
+                                title = "Zakat & Charity (زکوٰۃ و صدقات)",
+                                subtitle = "Gold/Silver Nisab calculator, 2.5% calculation & donation history",
+                                badge = "2.5% Nisab",
+                                icon = Icons.Default.VolunteerActivism,
+                                iconTint = Color(0xFFB45309),
+                                iconBg = Color(0xFFFDE68A).copy(alpha = 0.45f),
+                                tag = "zakat_module_card",
+                                onClick = onNavigateToZakat
                             )
                         }
                     }
                 }
+
+                // Wide Screen: Row 2 (Needs & Recurring)
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            PlanModuleCard(
+                                title = "Needs & Wishlist (ضروریات)",
+                                subtitle = if (activeNeeds.isEmpty()) "Organize planned purchases by priority" else "${activeNeeds.size} Pending purchase goals and priorities",
+                                badge = if (activeNeeds.isNotEmpty()) "${activeNeeds.size} Items" else null,
+                                icon = Icons.Default.Checklist,
+                                iconTint = ClayInkDeep,
+                                iconBg = ClayAccentLime.copy(alpha = 0.35f),
+                                tag = "needs_module_card",
+                                onClick = onNavigateToNeeds
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
+                                color = ClaySurface,
+                                shape = RoundedCornerShape(18.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(18.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(ClayPanelBlue),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarMonth,
+                                            contentDescription = null,
+                                            tint = ClayInkDeep,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Recurring Bills",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = ClayTextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${recurringRules.size} recurring rules scheduled",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = ClayTextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Phone single column
+                item {
+                    PlanModuleCard(
+                        title = "Kameti Savings (کمیٹی)",
+                        subtitle = if (kametis.isEmpty()) "Start a committee pool or track contributions" else "${kametis.size} Active Circles · Payouts & contributions",
+                        badge = if (kametis.isNotEmpty()) "${kametis.size} Active" else null,
+                        icon = Icons.Default.Savings,
+                        iconTint = SemanticIncome,
+                        iconBg = SemanticIncome.copy(alpha = 0.12f),
+                        tag = "kameti_module_card",
+                        onClick = onNavigateToKameti
+                    )
+                }
+
+                item {
+                    PlanModuleCard(
+                        title = "Zakat & Charity (زکوٰۃ و صدقات)",
+                        subtitle = "Gold/Silver Nisab calculator, 2.5% calculation & donation history",
+                        badge = "2.5% Nisab",
+                        icon = Icons.Default.VolunteerActivism,
+                        iconTint = Color(0xFFB45309),
+                        iconBg = Color(0xFFFDE68A).copy(alpha = 0.45f),
+                        tag = "zakat_module_card",
+                        onClick = onNavigateToZakat
+                    )
+                }
+
+                item {
+                    PlanModuleCard(
+                        title = "Needs & Wishlist (ضروریات)",
+                        subtitle = if (activeNeeds.isEmpty()) "Organize planned purchases by priority" else "${activeNeeds.size} Pending purchase goals and priorities",
+                        badge = if (activeNeeds.isNotEmpty()) "${activeNeeds.size} Items" else null,
+                        icon = Icons.Default.Checklist,
+                        iconTint = ClayInkDeep,
+                        iconBg = ClayAccentLime.copy(alpha = 0.35f),
+                        tag = "needs_module_card",
+                        onClick = onNavigateToNeeds
+                    )
+                }
+
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(18.dp)),
+                        color = ClaySurface,
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(ClayPanelBlue),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = ClayInkDeep,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Automated Recurring Bills",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ClayTextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${recurringRules.size} recurring payment rules currently scheduled",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ClayTextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
             }
+        }
         }
     }
 }

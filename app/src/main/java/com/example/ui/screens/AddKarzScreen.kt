@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -663,10 +665,14 @@ fun AddKarzScreen(
         val selectedAccName = accounts.find { it.id == selectedAccountId }?.name ?: "None"
         AlertDialog(
             onDismissRequest = { showReviewDialog = false },
+            modifier = Modifier.widthIn(max = 500.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
             title = {
                 Text(
                     text = "Confirm Karz Record",
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = ClayTextPrimary
                 )
             },
@@ -692,8 +698,10 @@ fun AddKarzScreen(
 
                     Surface(
                         color = ClaySurface,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(10.dp))
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Text(
@@ -751,20 +759,23 @@ fun AddKarzScreen(
                         containerColor = ClayInkDeep,
                         contentColor = Color.White
                     ),
-                    modifier = Modifier.testTag("confirm_save_debt_button")
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .heightIn(min = 44.dp)
+                        .testTag("confirm_save_debt_button")
                 ) {
                     Text("Confirm & Save")
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showReviewDialog = false }
+                    onClick = { showReviewDialog = false },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.heightIn(min = 44.dp)
                 ) {
                     Text("Cancel", color = ClayTextSecondary)
                 }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(16.dp)
+            }
         )
     }
 }

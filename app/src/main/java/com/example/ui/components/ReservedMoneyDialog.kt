@@ -203,7 +203,8 @@ fun ReservedMoneyDialog(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(ClaySurface)
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    .border(1.dp, ClayBorderHairline, RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {

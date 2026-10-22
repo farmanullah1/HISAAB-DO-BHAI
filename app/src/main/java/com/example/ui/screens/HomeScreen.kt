@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -164,14 +165,19 @@ fun HomeScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        LazyColumn(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .testTag("home_ledger_list"),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            val isWideScreen = maxWidth >= 600.dp
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("home_ledger_list"),
+                contentPadding = PaddingValues(horizontal = if (isWideScreen) 24.dp else 20.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
             // Header: Wordmark & Actions
             item {
                 Row(
@@ -447,22 +453,44 @@ fun HomeScreen(
                 }
             }
 
-            // 30 Days Activity Summary Card
-            item {
-                MonthlySummaryCard(
-                    summary = monthlySummary,
-                    privacyMode = privacyMode
-                )
-            }
-
-            // Karz Summary Card (Debt & Loan Management)
-            if (karzSummary != null) {
+            // 30 Days Activity Summary & Karz Cards
+            if (isWideScreen && karzSummary != null) {
                 item {
-                    KarzSummaryCard(
-                        summary = karzSummary,
-                        privacyMode = privacyMode,
-                        onViewAll = onNavigateToKarz
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            MonthlySummaryCard(
+                                summary = monthlySummary,
+                                privacyMode = privacyMode
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            KarzSummaryCard(
+                                summary = karzSummary,
+                                privacyMode = privacyMode,
+                                onViewAll = onNavigateToKarz
+                            )
+                        }
+                    }
+                }
+            } else {
+                item {
+                    MonthlySummaryCard(
+                        summary = monthlySummary,
+                        privacyMode = privacyMode
                     )
+                }
+
+                if (karzSummary != null) {
+                    item {
+                        KarzSummaryCard(
+                            summary = karzSummary,
+                            privacyMode = privacyMode,
+                            onViewAll = onNavigateToKarz
+                        )
+                    }
                 }
             }
 
@@ -575,6 +603,7 @@ fun HomeScreen(
             item {
                 Spacer(modifier = Modifier.height(30.dp))
             }
+        }
         }
     }
 

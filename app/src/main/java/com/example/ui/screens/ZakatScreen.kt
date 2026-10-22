@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -219,11 +223,15 @@ fun ZakatCalculatorContent(
     val isNisabReached = NisabCalculator.isNisabReached(netEligibleWealth, nisabThresholdPaisa)
     val zakatPayablePaisa = if (isNisabReached) NisabCalculator.zakatPayablePaisa(netEligibleWealth) else 0L
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
     ) {
+        val isWideScreen = maxWidth >= 600.dp
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = if (isWideScreen) 24.dp else 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         // Standard Selector: Silver vs Gold
         item {
             Surface(
@@ -408,7 +416,10 @@ fun ZakatCalculatorContent(
                                 snapshotSavedMessage = "Snapshot saved to historical ledger ✓"
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 44.dp)
                         ) {
                             Text("Save Calculation Snapshot")
                         }
@@ -433,6 +444,7 @@ fun ZakatCalculatorContent(
         }
     }
 }
+}
 
 @Composable
 fun CharityLogContent(
@@ -440,122 +452,133 @@ fun CharityLogContent(
     privacyMode: Boolean,
     onAddClick: () -> Unit
 ) {
-    if (records.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.VolunteerActivism,
-                    contentDescription = null,
-                    tint = ClayTextSecondary,
-                    modifier = Modifier.size(64.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "No Charity or Sadqah Recorded",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = ClayTextPrimary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Record and keep private audit logs of your Zakat, Sadqah, Fitrana, and Khairat disbursements.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ClayTextSecondary,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                Button(
-                    onClick = onAddClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
-                    shape = RoundedCornerShape(12.dp)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 600.dp
+        if (records.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = if (isWideScreen) 32.dp else 24.dp, vertical = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.widthIn(max = 520.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Record Charity Payment (صدقہ / زکوٰۃ درج کریں)")
-                }
-            }
-        }
-    } else {
-        val totalCharity = records.sumOf { it.amountPaisa }
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp)),
-                    color = ClaySurface
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Icon(
+                        imageVector = Icons.Default.VolunteerActivism,
+                        contentDescription = null,
+                        tint = ClayTextSecondary,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No Charity or Sadqah Recorded",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ClayTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Record and keep private audit logs of your Zakat, Sadqah, Fitrana, and Khairat disbursements.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ClayTextSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = onAddClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
-                        Column {
-                            Text("Total Recorded Charity", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
-                            Text(
-                                text = if (privacyMode) "₨ ••••••" else PkrFormatter.format(totalCharity),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = ClayInkDeep
-                            )
-                        }
-                        Button(
-                            onClick = onAddClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Record")
-                        }
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Record Charity Payment (صدقہ / زکوٰۃ درج کریں)")
                     }
                 }
             }
-
-            items(records, key = { it.id }) { record ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp)),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Row(
+        } else {
+            val totalCharity = records.sumOf { it.amountPaisa }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    horizontal = if (isWideScreen) 24.dp else 16.dp,
+                    vertical = 16.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(14.dp)),
+                        color = ClaySurface
                     ) {
-                        Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Total Recorded Charity", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
+                                Text(
+                                    text = if (privacyMode) "₨ ••••••" else PkrFormatter.format(totalCharity),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ClayInkDeep
+                                )
+                            }
+                            Button(
+                                onClick = onAddClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.heightIn(min = 44.dp)
+                            ) {
+                                Text("Record")
+                            }
+                        }
+                    }
+                }
+
+                items(records, key = { it.id }) { record ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, ClayBorderHairline, RoundedCornerShape(12.dp)),
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = record.recipientName.ifEmpty { record.category.name },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ClayTextPrimary
+                                )
+                                Text(
+                                    text = "${record.category.name}" + if (record.note.isNotBlank()) " · ${record.note}" else "",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ClayTextSecondary
+                                )
+                            }
                             Text(
-                                text = record.recipientName.ifEmpty { record.category.name },
+                                text = if (privacyMode) "₨ •••••" else PkrFormatter.format(record.amountPaisa),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = ClayTextPrimary
-                            )
-                            Text(
-                                text = "${record.category.name}" + if (record.note.isNotBlank()) " · ${record.note}" else "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ClayTextSecondary
+                                color = SemanticIncome
                             )
                         }
-                        Text(
-                            text = if (privacyMode) "₨ •••••" else PkrFormatter.format(record.amountPaisa),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = SemanticIncome
-                        )
                     }
                 }
             }
@@ -586,15 +609,35 @@ fun AddCharityPaymentDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Charity Disbursement") },
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                "Record Charity Disbursement",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = ClayTextPrimary
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     CharityCategory.entries.take(4).forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },
-                            label = { Text(cat.name, fontSize = 11.sp) }
+                            label = { Text(cat.name, fontSize = 11.sp) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = category == cat,
+                                borderColor = if (category == cat) ClayInkDeep else ClayBorderHairline,
+                                selectedBorderColor = ClayInkDeep
+                            )
                         )
                     }
                 }
@@ -604,6 +647,7 @@ fun AddCharityPaymentDialog(
                     onValueChange = { amountText = it },
                     label = { Text("Amount (PKR) *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -612,24 +656,45 @@ fun AddCharityPaymentDialog(
                     onValueChange = { recipient = it },
                     label = { Text("Recipient or Organization (Optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 if (accounts.isNotEmpty()) {
                     Text("Deduct from Account:", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
-                    accounts.forEach { acc ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedAccountId = acc.id }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (acc.id == selectedAccountId) "●  ${acc.name}" else "○  ${acc.name}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ClayTextPrimary
-                            )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        accounts.forEach { acc ->
+                            val isSelected = acc.id == selectedAccountId
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) ClayInkDeep else ClayBorderHairline,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { selectedAccountId = acc.id },
+                                color = if (isSelected) ClaySurface else Color.Transparent
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = if (isSelected) "●" else "○",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSelected) ClayInkDeep else ClayTextSecondary,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Text(
+                                        text = acc.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = ClayTextPrimary,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -639,6 +704,7 @@ fun AddCharityPaymentDialog(
                     onValueChange = { note = it },
                     label = { Text("Notes (Optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -659,14 +725,20 @@ fun AddCharityPaymentDialog(
                         )
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Confirm & Record")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text("Cancel", color = ClayTextSecondary)
             }
         }
     )

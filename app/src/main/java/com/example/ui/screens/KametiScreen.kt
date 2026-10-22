@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,9 +14,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -171,7 +174,8 @@ fun KametiScreen(
                     Button(
                         onClick = { showAddSheet = true },
                         colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
@@ -180,24 +184,29 @@ fun KametiScreen(
                 }
             }
         } else {
-            LazyColumn(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(innerPadding)
             ) {
-                items(kametis, key = { it.id }) { kameti ->
-                    KametiCard(
-                        kameti = kameti,
-                        viewModel = viewModel,
-                        accounts = accounts,
-                        privacyMode = privacyMode,
-                        isExpanded = selectedKametiId == kameti.id,
-                        onToggleExpand = {
-                            selectedKametiId = if (selectedKametiId == kameti.id) null else kameti.id
-                        }
-                    )
+                val isWideScreen = maxWidth >= 600.dp
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = if (isWideScreen) 24.dp else 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(kametis, key = { it.id }) { kameti ->
+                        KametiCard(
+                            kameti = kameti,
+                            viewModel = viewModel,
+                            accounts = accounts,
+                            privacyMode = privacyMode,
+                            isExpanded = selectedKametiId == kameti.id,
+                            onToggleExpand = {
+                                selectedKametiId = if (selectedKametiId == kameti.id) null else kameti.id
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -280,7 +289,8 @@ fun KametiCard(
 
                 Surface(
                     color = ClayAccentLime.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ClayAccentLime.copy(alpha = 0.5f))
                 ) {
                     Text(
                         text = if (privacyMode) "₨ ••••••" else PkrFormatter.format(kameti.contributionPaisa),
@@ -344,8 +354,9 @@ fun KametiCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { showClaimPayoutDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ClayBorderHairline)
                 ) {
                     Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -675,23 +686,42 @@ fun RecordContributionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Contribution") },
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = "Record Contribution",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = ClayTextPrimary
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Pay installment ${contribution.installmentIndex} for ${PkrFormatter.format(contribution.expectedPaisa)} from your cash or bank account.")
+                Text(
+                    text = "Pay installment ${contribution.installmentIndex} for ${PkrFormatter.format(contribution.expectedPaisa)} from your cash or bank account.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ClayTextPrimary
+                )
                 if (accounts.isNotEmpty()) {
                     Text("Select Account:", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
                     accounts.forEach { acc ->
+                        val isSelected = acc.id == selectedAccountId
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) ClayAccentLime.copy(alpha = 0.2f) else ClaySurface)
+                                .border(1.dp, if (isSelected) ClayAccentLime else ClayBorderHairline, RoundedCornerShape(10.dp))
                                 .clickable { selectedAccountId = acc.id }
-                                .padding(vertical = 4.dp)
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = if (acc.id == selectedAccountId) "●  ${acc.name}" else "○  ${acc.name}",
+                                text = acc.name,
                                 style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
                                 color = ClayTextPrimary
                             )
                         }
@@ -702,6 +732,7 @@ fun RecordContributionDialog(
                     onValueChange = { note = it },
                     label = { Text("Payment Note (Optional)") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -711,14 +742,19 @@ fun RecordContributionDialog(
                 onClick = {
                     onConfirm(selectedAccountId, contribution.expectedPaisa, LocalDate.now().toEpochDay(), note)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep, contentColor = androidx.compose.ui.graphics.Color.White),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Confirm Payment")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text("Cancel", color = ClayTextSecondary)
             }
         }
     )
@@ -738,30 +774,50 @@ fun ClaimPayoutDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Claim Committee Payout") },
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = "Claim Committee Payout",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = ClayTextPrimary
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Record committee payout into your account. Note: Committee payout is non-income capital repayment.")
+                Text(
+                    text = "Record committee payout into your account. Note: Committee payout is non-income capital repayment.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ClayTextPrimary
+                )
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
                     label = { Text("Received Amount (PKR)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (accounts.isNotEmpty()) {
                     Text("Deposit Into Account:", style = MaterialTheme.typography.labelSmall, color = ClayTextSecondary)
                     accounts.forEach { acc ->
+                        val isSelected = acc.id == selectedAccountId
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) ClayAccentLime.copy(alpha = 0.2f) else ClaySurface)
+                                .border(1.dp, if (isSelected) ClayAccentLime else ClayBorderHairline, RoundedCornerShape(10.dp))
                                 .clickable { selectedAccountId = acc.id }
-                                .padding(vertical = 4.dp)
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
-                                text = if (acc.id == selectedAccountId) "●  ${acc.name}" else "○  ${acc.name}",
+                                text = acc.name,
                                 style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
                                 color = ClayTextPrimary
                             )
                         }
@@ -775,14 +831,19 @@ fun ClaimPayoutDialog(
                     val parsed = Money.parsePaisa(amountText) ?: defaultAmount
                     onConfirm(selectedAccountId, parsed, LocalDate.now().toEpochDay(), note)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep)
+                colors = ButtonDefaults.buttonColors(containerColor = ClayInkDeep, contentColor = androidx.compose.ui.graphics.Color.White),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
             ) {
                 Text("Claim Payout")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text("Cancel", color = ClayTextSecondary)
             }
         }
     )

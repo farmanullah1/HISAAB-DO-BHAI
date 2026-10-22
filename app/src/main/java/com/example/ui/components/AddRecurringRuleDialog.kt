@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -31,6 +33,7 @@ import com.example.data.model.RecurringFrequency
 import com.example.data.model.TransactionType
 import com.example.domain.Money
 import com.example.ui.theme.ClayAccentLime
+import com.example.ui.theme.ClayBorderHairline
 import com.example.ui.theme.ClayInkDeep
 
 @Composable
@@ -63,6 +66,9 @@ fun AddRecurringRuleDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = 500.dp),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(text = "New Recurring Rule", style = MaterialTheme.typography.titleLarge)
         },
@@ -80,6 +86,7 @@ fun AddRecurringRuleDialog(
                     label = { Text("Title * (e.g. Apartment Rent)") },
                     isError = titleError,
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().testTag("recurring_title_input")
                 )
 
@@ -92,6 +99,13 @@ fun AddRecurringRuleDialog(
                             selected = selectedType == type,
                             onClick = { selectedType = type },
                             label = { Text(if (type == TransactionType.EXPENSE) "Expense" else "Income") },
+                            shape = RoundedCornerShape(10.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedType == type,
+                                borderColor = ClayBorderHairline,
+                                selectedBorderColor = ClayAccentLime
+                            ),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = ClayAccentLime,
                                 selectedLabelColor = ClayInkDeep
@@ -110,6 +124,7 @@ fun AddRecurringRuleDialog(
                     label = { Text("Amount (PKR) *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().testTag("recurring_amount_input")
                 )
 
@@ -128,6 +143,13 @@ fun AddRecurringRuleDialog(
                             selected = selectedFrequency == freq,
                             onClick = { selectedFrequency = freq },
                             label = { Text(freq.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFrequency == freq,
+                                borderColor = ClayBorderHairline,
+                                selectedBorderColor = ClayAccentLime
+                            ),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = ClayAccentLime,
                                 selectedLabelColor = ClayInkDeep
@@ -141,6 +163,7 @@ fun AddRecurringRuleDialog(
                     onValueChange = { note = it },
                     label = { Text("Notes (optional)") },
                     maxLines = 2,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -169,17 +192,22 @@ fun AddRecurringRuleDialog(
                     containerColor = ClayInkDeep,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("save_recurring_rule_button")
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .testTag("save_recurring_rule_button")
             ) {
                 Text("Save Rule")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
                 Text("Cancel", color = MaterialTheme.colorScheme.secondary)
             }
-        },
-        shape = RoundedCornerShape(18.dp)
+        }
     )
 }
